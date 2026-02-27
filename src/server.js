@@ -2,6 +2,12 @@ import express from "express";
 import { WebSocketServer } from "ws";
 import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const websiteDirectory = path.resolve(__dirname, "..", "website");
 
 function parseBoolean(input, fallback = false) {
   if (input === undefined) return fallback;
@@ -11,6 +17,7 @@ function parseBoolean(input, fallback = false) {
 export function createRelayServer({ port = 3000, host = "0.0.0.0", verbose = false } = {}) {
   const app = express();
   app.use(express.json());
+  app.use(express.static(websiteDirectory));
 
   const registeredHosts = new Map();
 

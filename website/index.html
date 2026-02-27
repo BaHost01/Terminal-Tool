@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Terminal Tool Relay</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>Terminal Tool Relay</h1>
+      <p class="subtitle">Custom website served from the dedicated <code>website/</code> folder.</p>
+
+      <section class="card">
+        <h2>Relay status</h2>
+        <p id="health">Loading health data...</p>
+      </section>
+
+      <section class="card">
+        <h2>API shortcuts</h2>
+        <ul>
+          <li><code>GET /health</code></li>
+          <li><code>POST /api/register-host</code></li>
+          <li><code>GET /api/hosts/:hostId</code></li>
+          <li><code>WS /ws/host</code> and <code>WS /ws/client</code></li>
+        </ul>
+      </section>
+    </main>
+
+    <script src="/site.js" type="module"></script>
+  </body>
+</html>

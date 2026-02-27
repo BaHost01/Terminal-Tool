@@ -20,7 +20,7 @@ That user can run commands and access files your host user can access.
 - Host ➜ Website/Relay ➜ Client
 - Client ➜ Website/Relay ➜ Host
 
-The relay server is stateless/in-memory for host auth and websocket routing:
+The relay server is stateless/in-memory for host auth and websocket routing, and now serves a custom landing page from `website/`:
 
 - `POST /api/register-host` to register host credentials
 - `GET /api/hosts/:hostId` for status
@@ -55,9 +55,10 @@ On the machine that will be public or reachable by both host and client:
 terminal-tool server --host 0.0.0.0 --port 3000
 ```
 
-Check health:
+Check website and health:
 
 ```bash
+open http://127.0.0.1:3000
 curl http://127.0.0.1:3000/health
 ```
 
