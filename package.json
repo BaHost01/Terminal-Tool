@@ -1,0 +1,25 @@
+{
+  "name": "terminal-tool-bridge",
+  "version": "1.0.0",
+  "description": "Relay terminal access from a host machine to a remote client through a central API",
+  "type": "module",
+  "bin": {
+    "terminal-tool": "./src/cli.js"
+  },
+  "scripts": {
+    "start": "node src/cli.js server",
+    "check": "node --check src/cli.js && node --check src/server.js"
+  },
+  "keywords": [
+    "terminal",
+    "websocket",
+    "relay",
+    "remote-shell"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "commander": "^12.1.0",
+    "express": "^4.21.2",
+    "ws": "^8.18.0"
+  }
+}
