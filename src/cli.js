@@ -3,7 +3,6 @@
 import { Command } from "commander";
 import { WebSocket } from "ws";
 import { spawn, spawnSync } from "node:child_process";
-import readline from "node:readline";
 import { randomUUID } from "node:crypto";
 import { createRelayServer } from "./server.js";
 
@@ -61,21 +60,21 @@ function shellSpec(shellName) {
       return {
         shell: shellName,
         buildArgs: (command) => ["/d", "/s", "/c", command],
-        terminateSignal: "SIGTERM"
+        interactiveArgs: []
       };
     }
 
     return {
       shell: shellName,
       buildArgs: (command) => ["-Command", command],
-      terminateSignal: "SIGTERM"
+      interactiveArgs: ["-NoLogo"]
     };
   }
 
   return {
     shell: shellName,
     buildArgs: (command) => ["-lc", command],
-    terminateSignal: "SIGTERM"
+    interactiveArgs: ["-l"]
   };
 }
 
@@ -83,10 +82,10 @@ function resolveShellPlan(shellOverride) {
   const candidates = [];
   if (shellOverride) {
     candidates.push(shellOverride);
-    if (IS_WINDOWS && !/cmd(\.exe)?$/i.test(shellOverride)) candidates.push("cmd");
+    if (IS_WINDOWS && !/cmd(\.exe)?$/i.test(shellOverride)) candidates.push("cmd.exe", "cmd");
     if (!IS_WINDOWS && shellOverride !== "bash") candidates.push("bash", "sh");
   } else if (IS_WINDOWS) {
-    candidates.push("powershell", "cmd");
+    candidates.push("powershell.exe", "pwsh", "cmd.exe", "cmd");
   } else {
     candidates.push("bash", "sh");
   }
@@ -158,6 +157,16 @@ function killProcess(child, reason = "cleanup") {
   console.log(`[host] sent termination signal (${reason}) to pid=${child.pid}`);
 }
 
+async function loadPty() {
+  try {
+    const mod = await import("node-pty");
+    return mod.default ?? mod;
+  } catch (error) {
+    console.warn(`[host] PTY unavailable (${error.message}); using non-interactive spawn fallback`);
+    return null;
+  }
+}
+
 function trySpawn(shellPlan, command, cwd) {
   const attempted = [];
   for (const spec of shellPlan) {
@@ -167,7 +176,7 @@ function trySpawn(shellPlan, command, cwd) {
       const child = spawn(spec.shell, args, {
         cwd,
         env: { ...process.env },
-        stdio: ["ignore", "pipe", "pipe"]
+        stdio: ["pipe", "pipe", "pipe"]
       });
       return { child, spec, attempted };
     } catch (error) {
@@ -182,6 +191,8 @@ function trySpawn(shellPlan, command, cwd) {
 
 function attachHostShell(ws, shellPlan, policy) {
   const runningCommands = new Map();
+  const isTTY = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+  console.log(`[host] tty-detect stdin=${Boolean(process.stdin.isTTY)} stdout=${Boolean(process.stdout.isTTY)} mode=${isTTY ? "interactive" : "non-interactive"}`);
 
   const safeSend = (payload) => {
     if (ws.readyState === WebSocket.OPEN) {
@@ -196,36 +207,54 @@ function attachHostShell(ws, shellPlan, policy) {
     }
   };
 
-  ws.on("message", (raw) => {
-    let incoming;
-    try {
-      incoming = JSON.parse(String(raw));
-    } catch {
-      console.warn("[host] ignoring non-JSON websocket message");
-      return;
-    }
+  const ptySession = {
+    proc: null,
+    shell: null,
+    usingPty: false
+  };
 
-    if (incoming.type === "system") {
-      console.log(`[system] ${incoming.message}`);
-      return;
-    }
+  const startPty = async () => {
+    if (!isTTY || ptySession.proc) return;
 
-    if (incoming.type === "cancel") {
-      const active = runningCommands.get(incoming.requestId);
-      if (active) {
-        killProcess(active.child, "client-cancel");
-        runningCommands.delete(incoming.requestId);
-        console.log(`[host] command cancelled requestId=${incoming.requestId}`);
+    const pty = await loadPty();
+    if (!pty) return;
+
+    for (const spec of shellPlan) {
+      try {
+        const proc = pty.spawn(spec.shell, spec.interactiveArgs, {
+          name: "xterm-256color",
+          cwd: policy.cwd,
+          env: { ...process.env, TERM: process.env.TERM || "xterm-256color" },
+          cols: process.stdout.columns || 120,
+          rows: process.stdout.rows || 30,
+          encoding: "utf8"
+        });
+
+        ptySession.proc = proc;
+        ptySession.shell = spec.shell;
+        ptySession.usingPty = true;
+
+        proc.onData((data) => {
+          safeSend({ type: "output", data });
+        });
+
+        proc.onExit(({ exitCode, signal }) => {
+          safeSend({ type: "system", message: `interactive shell exited (${exitCode}${signal ? `, ${signal}` : ""})` });
+          ptySession.proc = null;
+          ptySession.usingPty = false;
+        });
+
+        console.log(`[host] execution-mode=pty shell=${spec.shell}`);
+        return;
+      } catch (error) {
+        console.error(`[host] PTY spawn failed for shell=${spec.shell}: ${error.message}`);
       }
-      return;
     }
 
-    if (incoming.type !== "command") {
-      return;
-    }
+    console.warn("[host] PTY initialization failed for all shell candidates; falling back to spawn mode");
+  };
 
-    const requestId = incoming.requestId;
-    const command = String(incoming.command || "");
+  const executeCommand = (requestId, command) => {
     const evaluation = evaluateCommand(command, policy);
 
     if (!evaluation.ok) {
@@ -253,13 +282,14 @@ function attachHostShell(ws, shellPlan, policy) {
 
     const { child, spec } = spawned;
     runningCommands.set(requestId, { child, startedAt: Date.now() });
+    console.log(`[host] execution-mode=spawn shell=${spec.shell}`);
 
     child.stdout.on("data", (chunk) => {
-      safeSend({ type: "stdout", requestId, data: chunk.toString() });
+      safeSend({ type: "stdout", requestId, data: chunk.toString("utf8") });
     });
 
     child.stderr.on("data", (chunk) => {
-      safeSend({ type: "stderr", requestId, data: chunk.toString() });
+      safeSend({ type: "stderr", requestId, data: chunk.toString("utf8") });
     });
 
     child.on("close", (code) => {
@@ -277,43 +307,170 @@ function attachHostShell(ws, shellPlan, policy) {
       safeSend({ type: "exit", requestId, code: 1 });
       console.error(`[host] process error requestId=${requestId}: ${msg}`);
     });
+  };
+
+  startPty();
+
+  ws.on("message", (raw) => {
+    let incoming;
+    try {
+      incoming = JSON.parse(String(raw));
+    } catch {
+      console.warn("[host] ignoring non-JSON websocket message");
+      return;
+    }
+
+    if (incoming.type === "system") {
+      console.log(`[system] ${incoming.message}`);
+      return;
+    }
+
+    if (incoming.type === "cancel") {
+      const requestId = String(incoming.requestId || "");
+      if (requestId) {
+        const active = runningCommands.get(requestId);
+        if (active) {
+          killProcess(active.child, "client-cancel");
+          runningCommands.delete(requestId);
+          console.log(`[host] command cancelled requestId=${requestId}`);
+          return;
+        }
+      }
+
+      if (ptySession.proc) {
+        ptySession.proc.write("\u0003");
+      }
+      return;
+    }
+
+    if (incoming.type === "input") {
+      if (ptySession.proc) {
+        ptySession.proc.write(String(incoming.data || ""));
+      } else {
+        safeSend({ type: "system", message: "interactive input unavailable in spawn mode" });
+      }
+      return;
+    }
+
+    if (incoming.type === "resize") {
+      if (ptySession.proc) {
+        const cols = Number(incoming.cols) || 120;
+        const rows = Number(incoming.rows) || 30;
+        ptySession.proc.resize(cols, rows);
+      }
+      return;
+    }
+
+    if (incoming.type !== "command") {
+      return;
+    }
+
+    const requestId = incoming.requestId || randomUUID();
+    const command = String(incoming.command || "");
+    executeCommand(requestId, command);
   });
 
   ws.on("close", () => {
     console.log("[host] websocket closed, cleaning up running commands");
     terminateAll("ws-close");
+    if (ptySession.proc) {
+      ptySession.proc.kill();
+      ptySession.proc = null;
+    }
   });
 
   ws.on("error", (err) => {
     console.error(`[host] websocket error: ${err.message}`);
     terminateAll("ws-error");
+    if (ptySession.proc) {
+      ptySession.proc.kill();
+      ptySession.proc = null;
+    }
   });
 }
 
 function connectClient({ server, hostId, username, password }) {
   let lastRequestId = null;
   const ws = new WebSocket(relayUrl(server, "/ws/client", { hostId, username, password }));
+  const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+
+  const handleInteractiveStdin = () => {
+    const onData = (chunk) => {
+      if (ws.readyState !== WebSocket.OPEN) return;
+      ws.send(JSON.stringify({ type: "input", data: chunk.toString("utf8") }));
+    };
+
+    const onResize = () => {
+      if (ws.readyState !== WebSocket.OPEN) return;
+      ws.send(JSON.stringify({
+        type: "resize",
+        cols: process.stdout.columns || 120,
+        rows: process.stdout.rows || 30
+      }));
+    };
+
+    process.stdin.setRawMode(true);
+    process.stdin.resume();
+    process.stdin.on("data", onData);
+    process.stdout.on("resize", onResize);
+    onResize();
+
+    return () => {
+      process.stdin.off("data", onData);
+      process.stdout.off("resize", onResize);
+      if (typeof process.stdin.setRawMode === "function") {
+        process.stdin.setRawMode(false);
+      }
+      process.stdin.pause();
+    };
+  };
+
+  const handleNonInteractiveStdin = () => {
+    let buffered = "";
+
+    const onData = (chunk) => {
+      buffered += chunk.toString("utf8");
+      const lines = buffered.split(/\r?\n/);
+      buffered = lines.pop() ?? "";
+
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        const requestId = randomUUID();
+        lastRequestId = requestId;
+        ws.send(JSON.stringify({ type: "command", command: line, requestId }));
+      }
+    };
+
+    const onEnd = () => {
+      if (buffered.trim()) {
+        const requestId = randomUUID();
+        lastRequestId = requestId;
+        ws.send(JSON.stringify({ type: "command", command: buffered.trim(), requestId }));
+      }
+    };
+
+    process.stdin.on("data", onData);
+    process.stdin.on("end", onEnd);
+    process.stdin.resume();
+
+    return () => {
+      process.stdin.off("data", onData);
+      process.stdin.off("end", onEnd);
+      process.stdin.pause();
+    };
+  };
+
+  let teardownInput = () => {};
 
   ws.on("open", () => {
-    console.log(`Connected to host ${hostId}. Type commands below.`);
-    const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
-
-    rl.on("line", (line) => {
-      const requestId = randomUUID();
-      lastRequestId = requestId;
-      ws.send(JSON.stringify({ type: "command", command: line, requestId }));
-    });
-
-    rl.on("SIGINT", () => {
-      if (lastRequestId) {
-        ws.send(JSON.stringify({ type: "cancel", requestId: lastRequestId }));
-        process.stdout.write("\n[system] cancellation signal sent\n");
-        return;
-      }
-
-      rl.close();
-      ws.close();
-    });
+    console.log(`Connected to host ${hostId}.`);
+    if (interactive) {
+      console.log("[client] tty detected; using stream input mode");
+      teardownInput = handleInteractiveStdin();
+    } else {
+      console.log("[client] no tty detected; using line command mode");
+      teardownInput = handleNonInteractiveStdin();
+    }
   });
 
   ws.on("message", (raw) => {
@@ -324,6 +481,7 @@ function connectClient({ server, hostId, username, password }) {
       return;
     }
 
+    if (incoming.type === "output") process.stdout.write(incoming.data || "");
     if (incoming.type === "stdout") process.stdout.write(incoming.data || "");
     if (incoming.type === "stderr") process.stderr.write(incoming.data || "");
     if (incoming.type === "exit") {
@@ -336,12 +494,31 @@ function connectClient({ server, hostId, username, password }) {
     if (incoming.type === "error") process.stderr.write(`\n[error] ${incoming.message}\n`);
   });
 
+  process.on("SIGINT", () => {
+    if (interactive) {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "input", data: "\u0003" }));
+      }
+      return;
+    }
+
+    if (lastRequestId && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "cancel", requestId: lastRequestId }));
+      process.stdout.write("\n[system] cancellation signal sent\n");
+      return;
+    }
+
+    ws.close();
+  });
+
   ws.on("close", () => {
+    teardownInput();
     console.log("Disconnected from relay server.");
     process.exit(0);
   });
 
   ws.on("error", (err) => {
+    teardownInput();
     console.error(`Connection error: ${err.message}`);
     process.exit(1);
   });
