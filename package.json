@@ -1,14 +1,14 @@
 {
-  "name": "terminal-tool-bridge",
-  "version": "1.0.0",
+  "name": "terminal-tool",
+  "version": "1.1.0",
   "description": "Relay terminal access from a host machine to a remote client through a central API",
   "type": "module",
   "bin": {
-    "terminal-tool": "./src/cli.js"
+    "terminal-tool": "./index.js"
   },
   "scripts": {
-    "start": "node src/cli.js server",
-    "check": "node --check src/cli.js && node --check src/server.js"
+    "start": "node index.js server",
+    "check": "node --check index.js && node --check src/cli.js && node --check src/server.js"
   },
   "keywords": [
     "terminal",
