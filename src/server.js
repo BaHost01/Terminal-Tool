@@ -155,8 +155,8 @@ export function createRelayServer({ port = 3000, host = "0.0.0.0", verbose = fal
       }
 
       if (role === "client") {
-        if (!["command", "cancel"].includes(message.type)) {
-          return safeSend(socket, { type: "error", message: "client can only send type=command|cancel" });
+        if (!["command", "cancel", "input", "resize"].includes(message.type)) {
+          return safeSend(socket, { type: "error", message: "client can only send type=command|cancel|input|resize" });
         }
 
         if (!record.hostSocket || record.hostSocket.readyState !== 1) {
@@ -181,7 +181,7 @@ export function createRelayServer({ port = 3000, host = "0.0.0.0", verbose = fal
       }
 
       if (role === "host") {
-        if (!["stdout", "stderr", "exit", "system"].includes(message.type)) {
+        if (!["stdout", "stderr", "exit", "system", "output"].includes(message.type)) {
           return safeSend(socket, { type: "error", message: "host sent unsupported message type" });
         }
 
