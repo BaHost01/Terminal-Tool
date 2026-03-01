@@ -2,18 +2,18 @@
 
 import { Command } from "commander";
 import { WebSocket } from "ws";
-import { spawn, spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
+import os from "node:os";
+import path from "node:path";
+import pty from "node-pty";
 import { createRelayServer } from "./server.js";
 
-const PLATFORM = process.platform;
-const IS_WINDOWS = PLATFORM === "win32";
-const DANGEROUS_PATTERN = /(;|&&|\|\||`|\$\(|\n|\r)/;
+const IS_WINDOWS = process.platform === "win32";
 
-function relayUrl(baseUrl, path, params) {
+function relayUrl(baseUrl, routePath, params) {
   const parsed = new URL(baseUrl);
   parsed.protocol = parsed.protocol === "https:" ? "wss:" : "ws:";
-  parsed.pathname = path;
+  parsed.pathname = routePath;
   parsed.search = new URLSearchParams(params).toString();
   return parsed.toString();
 }
@@ -40,159 +40,26 @@ function warningBanner() {
   console.warn("Use an isolated user account / VM and never share real production credentials.\n");
 }
 
-function commandBase(command) {
-  const match = String(command || "").trim().match(/^([A-Za-z0-9._-]+)/);
-  return match ? match[1].toLowerCase() : "";
+function resolveShell(shellOverride) {
+  if (shellOverride) return shellOverride;
+  if (os.platform() === "win32") return "powershell.exe";
+  return process.env.SHELL || "bash";
 }
 
-function isShellAvailable(shellName) {
-  const checker = IS_WINDOWS ? "where" : "which";
-  const result = spawnSync(checker, [shellName], { stdio: "ignore" });
-  return result.status === 0;
+function sanitizeSandboxDir(cwd, sandboxDir) {
+  const sandbox = path.resolve(sandboxDir || cwd || process.cwd());
+  const resolvedCwd = path.resolve(cwd || sandbox);
+
+  if (!resolvedCwd.startsWith(sandbox)) {
+    throw new Error(`cwd ${resolvedCwd} escapes sandbox directory ${sandbox}`);
+  }
+
+  return { sandbox, cwd: resolvedCwd };
 }
 
-function shellSpec(shellName) {
-  const lower = shellName.toLowerCase();
-  const windowsStyle = IS_WINDOWS || lower.includes("powershell") || lower === "pwsh" || lower === "cmd" || lower.endsWith("cmd.exe");
-
-  if (windowsStyle) {
-    if (lower === "cmd" || lower.endsWith("cmd.exe")) {
-      return {
-        shell: shellName,
-        buildArgs: (command) => ["/d", "/s", "/c", command],
-        interactiveArgs: []
-      };
-    }
-
-    return {
-      shell: shellName,
-      buildArgs: (command) => ["-Command", command],
-      interactiveArgs: ["-NoLogo"]
-    };
-  }
-
-  return {
-    shell: shellName,
-    buildArgs: (command) => ["-lc", command],
-    interactiveArgs: ["-l"]
-  };
-}
-
-function resolveShellPlan(shellOverride) {
-  const candidates = [];
-  if (shellOverride) {
-    candidates.push(shellOverride);
-    if (IS_WINDOWS && !/cmd(\.exe)?$/i.test(shellOverride)) candidates.push("cmd.exe", "cmd");
-    if (!IS_WINDOWS && shellOverride !== "bash") candidates.push("bash", "sh");
-  } else if (IS_WINDOWS) {
-    candidates.push("powershell.exe", "pwsh", "cmd.exe", "cmd");
-  } else {
-    candidates.push("bash", "sh");
-  }
-
-  const unique = [...new Set(candidates)];
-  const available = unique.filter((candidate) => candidate.includes("/") || candidate.includes("\\") || isShellAvailable(candidate));
-  const finalList = available.length > 0 ? available : unique;
-
-  return finalList.map((candidate) => shellSpec(candidate));
-}
-
-function buildHostPolicy(options) {
-  const whitelist = new Set(
-    String(options.whitelist || "")
-      .split(",")
-      .map((entry) => entry.trim().toLowerCase())
-      .filter(Boolean)
-  );
-
-  return {
-    cwd: options.cwd,
-    strictCwd: Boolean(options.strictCwd),
-    whitelist,
-    warnDangerous: true
-  };
-}
-
-function evaluateCommand(command, policy) {
-  const trimmed = String(command || "").trim();
-
-  if (!trimmed) {
-    return { ok: false, reason: "Empty command" };
-  }
-
-  if (trimmed.includes("\0")) {
-    return { ok: false, reason: "Command contains null bytes" };
-  }
-
-  if (policy.strictCwd && /(^|\s)cd\s+\.\./.test(trimmed)) {
-    return { ok: false, reason: "strict-cwd blocks directory traversal with 'cd ..'" };
-  }
-
-  if (policy.strictCwd && /(^|\s)(cd|cat|less|more|type)\s+([A-Za-z]:\\|\/)/i.test(trimmed)) {
-    return { ok: false, reason: "strict-cwd blocks absolute-path access attempts" };
-  }
-
-  const base = commandBase(trimmed);
-  if (policy.whitelist.size > 0 && !policy.whitelist.has(base)) {
-    return { ok: false, reason: `Command '${base || "<unknown>"}' is not in whitelist` };
-  }
-
-  if (policy.warnDangerous && DANGEROUS_PATTERN.test(trimmed)) {
-    return { ok: true, warning: "Command contains chaining/substitution operators. Review carefully." };
-  }
-
-  return { ok: true };
-}
-
-function killProcess(child, reason = "cleanup") {
-  if (!child || child.killed) return;
-
-  child.kill("SIGTERM");
-  setTimeout(() => {
-    if (!child.killed) {
-      child.kill("SIGKILL");
-    }
-  }, 3000).unref();
-
-  console.log(`[host] sent termination signal (${reason}) to pid=${child.pid}`);
-}
-
-async function loadPty() {
-  try {
-    const mod = await import("node-pty");
-    return mod.default ?? mod;
-  } catch (error) {
-    console.warn(`[host] PTY unavailable (${error.message}); using non-interactive spawn fallback`);
-    return null;
-  }
-}
-
-function trySpawn(shellPlan, command, cwd) {
-  const attempted = [];
-  for (const spec of shellPlan) {
-    attempted.push(spec.shell);
-    const args = spec.buildArgs(command);
-    try {
-      const child = spawn(spec.shell, args, {
-        cwd,
-        env: { ...process.env },
-        stdio: ["pipe", "pipe", "pipe"]
-      });
-      return { child, spec, attempted };
-    } catch (error) {
-      if (error?.code !== "ENOENT") {
-        throw error;
-      }
-    }
-  }
-
-  throw new Error(`No usable shell found. Attempted: ${attempted.join(", ")}`);
-}
-
-function attachHostShell(ws, shellPlan, policy) {
-  const runningCommands = new Map();
-  const isTTY = Boolean(process.stdin.isTTY && process.stdout.isTTY);
-  console.log(`[host] tty-detect stdin=${Boolean(process.stdin.isTTY)} stdout=${Boolean(process.stdout.isTTY)} mode=${isTTY ? "interactive" : "non-interactive"}`);
+function connectHost({ server, hostId, username, password, shell, cwd, sandboxDir }) {
+  const sessions = new Map();
+  const ws = new WebSocket(relayUrl(server, "/ws/host", { hostId, username, password }));
 
   const safeSend = (payload) => {
     if (ws.readyState === WebSocket.OPEN) {
@@ -200,220 +67,127 @@ function attachHostShell(ws, shellPlan, policy) {
     }
   };
 
-  const terminateAll = (reason) => {
-    for (const [requestId, active] of runningCommands.entries()) {
-      killProcess(active.child, reason);
-      runningCommands.delete(requestId);
-    }
-  };
+  const createSession = (clientId) => {
+    if (sessions.has(clientId)) return sessions.get(clientId);
 
-  const ptySession = {
-    proc: null,
-    shell: null,
-    usingPty: false
-  };
-
-  const startPty = async () => {
-    if (!isTTY || ptySession.proc) return;
-
-    const pty = await loadPty();
-    if (!pty) return;
-
-    for (const spec of shellPlan) {
-      try {
-        const proc = pty.spawn(spec.shell, spec.interactiveArgs, {
-          name: "xterm-256color",
-          cwd: policy.cwd,
-          env: { ...process.env, TERM: process.env.TERM || "xterm-256color" },
-          cols: process.stdout.columns || 120,
-          rows: process.stdout.rows || 30,
-          encoding: "utf8"
-        });
-
-        ptySession.proc = proc;
-        ptySession.shell = spec.shell;
-        ptySession.usingPty = true;
-
-        proc.onData((data) => {
-          safeSend({ type: "output", data });
-        });
-
-        proc.onExit(({ exitCode, signal }) => {
-          safeSend({ type: "system", message: `interactive shell exited (${exitCode}${signal ? `, ${signal}` : ""})` });
-          ptySession.proc = null;
-          ptySession.usingPty = false;
-        });
-
-        console.log(`[host] execution-mode=pty shell=${spec.shell}`);
-        return;
-      } catch (error) {
-        console.error(`[host] PTY spawn failed for shell=${spec.shell}: ${error.message}`);
-      }
-    }
-
-    console.warn("[host] PTY initialization failed for all shell candidates; falling back to spawn mode");
-  };
-
-  const executeCommand = (requestId, command) => {
-    const evaluation = evaluateCommand(command, policy);
-
-    if (!evaluation.ok) {
-      safeSend({ type: "stderr", requestId, data: `[policy] ${evaluation.reason}\n` });
-      safeSend({ type: "exit", requestId, code: 126 });
-      return;
-    }
-
-    if (evaluation.warning) {
-      console.warn(`[host][warning] ${evaluation.warning} command="${command}"`);
-      safeSend({ type: "system", message: `[warning] ${evaluation.warning}` });
-    }
-
-    console.log(`[host] exec requestId=${requestId} cwd=${policy.cwd} command="${command}"`);
-
-    let spawned;
-    try {
-      spawned = trySpawn(shellPlan, command, policy.cwd);
-    } catch (error) {
-      safeSend({ type: "stderr", requestId, data: `${error.message}\n` });
-      safeSend({ type: "exit", requestId, code: 1 });
-      console.error(`[host] failed to start command requestId=${requestId}: ${error.message}`);
-      return;
-    }
-
-    const { child, spec } = spawned;
-    runningCommands.set(requestId, { child, startedAt: Date.now() });
-    console.log(`[host] execution-mode=spawn shell=${spec.shell}`);
-
-    child.stdout.on("data", (chunk) => {
-      safeSend({ type: "stdout", requestId, data: chunk.toString("utf8") });
+    const proc = pty.spawn(shell, [], {
+      name: "xterm-256color",
+      cols: 120,
+      rows: 30,
+      cwd,
+      env: { ...process.env, TERM: "xterm-256color" }
     });
 
-    child.stderr.on("data", (chunk) => {
-      safeSend({ type: "stderr", requestId, data: chunk.toString("utf8") });
+    proc.onData((data) => {
+      safeSend({ type: "output", clientId, data });
     });
 
-    child.on("close", (code) => {
-      runningCommands.delete(requestId);
-      safeSend({ type: "exit", requestId, code });
-      console.log(`[host] command finished requestId=${requestId} code=${code} shell=${spec.shell}`);
+    proc.onExit(({ exitCode }) => {
+      safeSend({ type: "exit", clientId, code: exitCode });
+      sessions.delete(clientId);
     });
 
-    child.on("error", (err) => {
-      runningCommands.delete(requestId);
-      const msg = err?.code === "ENOENT"
-        ? `Shell executable not found: ${spec.shell}`
-        : `Process error: ${err.message}`;
-      safeSend({ type: "stderr", requestId, data: `${msg}\n` });
-      safeSend({ type: "exit", requestId, code: 1 });
-      console.error(`[host] process error requestId=${requestId}: ${msg}`);
-    });
+    const session = { proc };
+    sessions.set(clientId, session);
+    return session;
   };
 
-  startPty();
+  const closeSession = (clientId, reason = "session closed") => {
+    const session = sessions.get(clientId);
+    if (!session) return;
+    session.proc.kill();
+    sessions.delete(clientId);
+    safeSend({ type: "exit", clientId, code: 0, reason });
+  };
+
+  ws.on("open", () => {
+    console.log(`Host connected. Shell=${shell} cwd=${cwd} sandbox=${sandboxDir || cwd}`);
+  });
 
   ws.on("message", (raw) => {
     let incoming;
     try {
       incoming = JSON.parse(String(raw));
     } catch {
-      console.warn("[host] ignoring non-JSON websocket message");
       return;
     }
 
     if (incoming.type === "system") {
-      console.log(`[system] ${incoming.message}`);
+      if (incoming.message === "client disconnected" && incoming.clientId) {
+        closeSession(incoming.clientId, "client disconnected");
+      }
+      if (incoming.message === "client connected" && incoming.clientId) {
+        createSession(incoming.clientId);
+      }
+      console.log(`[system] ${incoming.message}${incoming.clientId ? ` (${incoming.clientId})` : ""}`);
       return;
     }
 
-    if (incoming.type === "cancel") {
-      const requestId = String(incoming.requestId || "");
-      if (requestId) {
-        const active = runningCommands.get(requestId);
-        if (active) {
-          killProcess(active.child, "client-cancel");
-          runningCommands.delete(requestId);
-          console.log(`[host] command cancelled requestId=${requestId}`);
-          return;
-        }
-      }
+    if (!["input", "resize"].includes(incoming.type)) return;
 
-      if (ptySession.proc) {
-        ptySession.proc.write("\u0003");
-      }
-      return;
-    }
+    const clientId = String(incoming.clientId || "");
+    if (!clientId) return;
+
+    const session = createSession(clientId);
 
     if (incoming.type === "input") {
-      if (ptySession.proc) {
-        ptySession.proc.write(String(incoming.data || ""));
-      } else {
-        safeSend({ type: "system", message: "interactive input unavailable in spawn mode" });
-      }
+      session.proc.write(String(incoming.data || ""));
       return;
     }
 
-    if (incoming.type === "resize") {
-      if (ptySession.proc) {
-        const cols = Number(incoming.cols) || 120;
-        const rows = Number(incoming.rows) || 30;
-        ptySession.proc.resize(cols, rows);
-      }
-      return;
-    }
-
-    if (incoming.type !== "command") {
-      return;
-    }
-
-    const requestId = incoming.requestId || randomUUID();
-    const command = String(incoming.command || "");
-    executeCommand(requestId, command);
+    const cols = Math.max(20, Number(incoming.cols) || 120);
+    const rows = Math.max(5, Number(incoming.rows) || 30);
+    session.proc.resize(cols, rows);
   });
 
   ws.on("close", () => {
-    console.log("[host] websocket closed, cleaning up running commands");
-    terminateAll("ws-close");
-    if (ptySession.proc) {
-      ptySession.proc.kill();
-      ptySession.proc = null;
+    for (const [clientId, session] of sessions.entries()) {
+      session.proc.kill();
+      sessions.delete(clientId);
     }
+    console.log("Host disconnected.");
+    process.exit(0);
   });
 
   ws.on("error", (err) => {
-    console.error(`[host] websocket error: ${err.message}`);
-    terminateAll("ws-error");
-    if (ptySession.proc) {
-      ptySession.proc.kill();
-      ptySession.proc = null;
-    }
+    console.error(`Host connection error: ${err.message}`);
+    process.exit(1);
   });
 }
 
 function connectClient({ server, hostId, username, password }) {
-  let lastRequestId = null;
   const ws = new WebSocket(relayUrl(server, "/ws/client", { hostId, username, password }));
   const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY);
+  let teardownInput = () => {};
 
-  const handleInteractiveStdin = () => {
+  const sendResize = () => {
+    if (ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({
+      type: "resize",
+      cols: process.stdout.columns || 120,
+      rows: process.stdout.rows || 30
+    }));
+  };
+
+  const setupInteractiveInput = () => {
+    if (typeof process.stdin.setRawMode !== "function") {
+      console.warn("[client] stdin is not a terminal; fallback to line mode");
+      return setupLineInput();
+    }
+
+    process.stdin.setRawMode(true);
+    process.stdin.resume();
+
     const onData = (chunk) => {
       if (ws.readyState !== WebSocket.OPEN) return;
       ws.send(JSON.stringify({ type: "input", data: chunk.toString("utf8") }));
     };
 
-    const onResize = () => {
-      if (ws.readyState !== WebSocket.OPEN) return;
-      ws.send(JSON.stringify({
-        type: "resize",
-        cols: process.stdout.columns || 120,
-        rows: process.stdout.rows || 30
-      }));
-    };
+    const onResize = () => sendResize();
 
-    process.stdin.setRawMode(true);
-    process.stdin.resume();
     process.stdin.on("data", onData);
     process.stdout.on("resize", onResize);
-    onResize();
+    sendResize();
 
     return () => {
       process.stdin.off("data", onData);
@@ -425,52 +199,23 @@ function connectClient({ server, hostId, username, password }) {
     };
   };
 
-  const handleNonInteractiveStdin = () => {
-    let buffered = "";
-
-    const onData = (chunk) => {
-      buffered += chunk.toString("utf8");
-      const lines = buffered.split(/\r?\n/);
-      buffered = lines.pop() ?? "";
-
-      for (const line of lines) {
-        if (!line.trim()) continue;
-        const requestId = randomUUID();
-        lastRequestId = requestId;
-        ws.send(JSON.stringify({ type: "command", command: line, requestId }));
-      }
-    };
-
-    const onEnd = () => {
-      if (buffered.trim()) {
-        const requestId = randomUUID();
-        lastRequestId = requestId;
-        ws.send(JSON.stringify({ type: "command", command: buffered.trim(), requestId }));
-      }
-    };
-
-    process.stdin.on("data", onData);
-    process.stdin.on("end", onEnd);
+  const setupLineInput = () => {
     process.stdin.resume();
+    const onData = (chunk) => {
+      if (ws.readyState !== WebSocket.OPEN) return;
+      ws.send(JSON.stringify({ type: "input", data: chunk.toString("utf8") }));
+    };
+    process.stdin.on("data", onData);
 
     return () => {
       process.stdin.off("data", onData);
-      process.stdin.off("end", onEnd);
       process.stdin.pause();
     };
   };
 
-  let teardownInput = () => {};
-
   ws.on("open", () => {
     console.log(`Connected to host ${hostId}.`);
-    if (interactive) {
-      console.log("[client] tty detected; using stream input mode");
-      teardownInput = handleInteractiveStdin();
-    } else {
-      console.log("[client] no tty detected; using line command mode");
-      teardownInput = handleNonInteractiveStdin();
-    }
+    teardownInput = interactive ? setupInteractiveInput() : setupLineInput();
   });
 
   ws.on("message", (raw) => {
@@ -482,32 +227,13 @@ function connectClient({ server, hostId, username, password }) {
     }
 
     if (incoming.type === "output") process.stdout.write(incoming.data || "");
-    if (incoming.type === "stdout") process.stdout.write(incoming.data || "");
-    if (incoming.type === "stderr") process.stderr.write(incoming.data || "");
-    if (incoming.type === "exit") {
-      if (incoming.requestId === lastRequestId) {
-        lastRequestId = null;
-      }
-      process.stdout.write(`\n[exit ${incoming.code}]\n`);
-    }
+    if (incoming.type === "exit") process.stdout.write(`\n[exit ${incoming.code}]\n`);
     if (incoming.type === "system") process.stdout.write(`\n[system] ${incoming.message}\n`);
     if (incoming.type === "error") process.stderr.write(`\n[error] ${incoming.message}\n`);
   });
 
   process.on("SIGINT", () => {
-    if (interactive) {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "input", data: "\u0003" }));
-      }
-      return;
-    }
-
-    if (lastRequestId && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "cancel", requestId: lastRequestId }));
-      process.stdout.write("\n[system] cancellation signal sent\n");
-      return;
-    }
-
+    if (interactive) return;
     ws.close();
   });
 
@@ -547,8 +273,7 @@ program
   .option("--host-id <id>", "Stable host ID (if omitted one is generated)")
   .option("--shell <path>", "Shell executable override (auto-detected by default)")
   .option("--cwd <path>", "Working directory to expose", process.cwd())
-  .option("--strict-cwd", "Block obvious absolute path and traversal patterns", false)
-  .option("--whitelist <commands>", "Comma-separated allowed command prefixes (e.g. ls,pwd,cat)")
+  .option("--sandbox-dir <path>", "Restrict host cwd to this directory")
   .option("--dangerously-allow-root", "Allow running as root user (not recommended)", false)
   .action(async (options) => {
     if (typeof process.getuid === "function" && process.getuid() === 0 && !options.dangerouslyAllowRoot) {
@@ -557,8 +282,8 @@ program
 
     warningBanner();
 
-    const shellPlan = resolveShellPlan(options.shell);
-    console.log(`[host] shell candidates: ${shellPlan.map((item) => item.shell).join(", ")}`);
+    const { cwd, sandbox } = sanitizeSandboxDir(options.cwd, options.sandboxDir);
+    const shell = resolveShell(options.shell);
 
     const registration = await registerHost({
       server: options.server,
@@ -568,38 +293,22 @@ program
     });
 
     console.log(`hostId: ${registration.hostId}`);
+    console.warn(`[host] security notice: this exposes shell access within sandbox ${sandbox}`);
 
-    const ws = new WebSocket(
-      relayUrl(options.server, "/ws/host", {
-        hostId: registration.hostId,
-        username: options.username,
-        password: options.password
-      })
-    );
-
-    ws.on("open", () => {
-      const policy = buildHostPolicy(options);
-      console.log(`Host connected. Exposing ${options.cwd}`);
-      if (policy.whitelist.size > 0) {
-        console.log(`[host] whitelist enabled: ${[...policy.whitelist].join(", ")}`);
-      }
-      attachHostShell(ws, shellPlan, policy);
-    });
-
-    ws.on("error", (err) => {
-      console.error(`Host connection error: ${err.message}`);
-      process.exit(1);
-    });
-
-    ws.on("close", () => {
-      console.log("Host disconnected.");
-      process.exit(0);
+    connectHost({
+      server: options.server,
+      hostId: registration.hostId,
+      username: options.username,
+      password: options.password,
+      shell,
+      cwd,
+      sandboxDir: sandbox
     });
   });
 
 program
   .command("client")
-  .description("Connect as remote player/user and send commands")
+  .description("Connect as remote user and open a real terminal stream")
   .requiredOption("--server <url>", "Relay server URL")
   .requiredOption("--host-id <id>", "hostId shared by host")
   .requiredOption("--username <username>", "Username from host")

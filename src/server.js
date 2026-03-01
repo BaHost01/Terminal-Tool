@@ -44,7 +44,7 @@ export function createRelayServer({ port = 3000, host = "0.0.0.0", verbose = fal
       username,
       password,
       hostSocket: existing?.hostSocket,
-      clientSocket: existing?.clientSocket,
+      clientSockets: existing?.clientSockets ?? new Map(),
       createdAt: existing?.createdAt ?? Date.now()
     });
 
@@ -66,7 +66,7 @@ export function createRelayServer({ port = 3000, host = "0.0.0.0", verbose = fal
       hostId: record.hostId,
       username: record.username,
       hostOnline: Boolean(record.hostSocket && record.hostSocket.readyState === 1),
-      clientConnected: Boolean(record.clientSocket && record.clientSocket.readyState === 1)
+      clientConnected: [...record.clientSockets.values()].some((socket) => socket.readyState === 1)
     });
   });
 
@@ -115,6 +115,7 @@ export function createRelayServer({ port = 3000, host = "0.0.0.0", verbose = fal
     }
 
     const record = auth.record;
+    const clientId = role === "client" ? randomUUID() : null;
 
     if (role === "host") {
       if (record.hostSocket && record.hostSocket.readyState === 1) {
@@ -123,22 +124,27 @@ export function createRelayServer({ port = 3000, host = "0.0.0.0", verbose = fal
       }
       record.hostSocket = socket;
       safeSend(socket, { type: "system", message: "host connected" });
-      safeSend(record.clientSocket, { type: "system", message: "host is online" });
+
+      for (const [id, clientSocket] of record.clientSockets.entries()) {
+        if (clientSocket.readyState !== 1) {
+          record.clientSockets.delete(id);
+          continue;
+        }
+        safeSend(clientSocket, { type: "system", message: "host is online", clientId: id });
+        safeSend(socket, { type: "system", message: "client connected", clientId: id });
+      }
     } else {
       if (!record.hostSocket || record.hostSocket.readyState !== 1) {
         return closeWithError(socket, "host is offline");
       }
-      if (record.clientSocket && record.clientSocket.readyState === 1) {
-        safeSend(record.clientSocket, { type: "system", message: "new client connected, closing this one" });
-        record.clientSocket.close();
-      }
-      record.clientSocket = socket;
-      safeSend(socket, { type: "system", message: "connected to host terminal" });
-      safeSend(record.hostSocket, { type: "system", message: "client connected" });
+
+      record.clientSockets.set(clientId, socket);
+      safeSend(socket, { type: "system", message: "connected to host terminal", clientId });
+      safeSend(record.hostSocket, { type: "system", message: "client connected", clientId });
     }
 
     if (verbose) {
-      console.log(`[relay] ${role} connected for hostId=${hostId}`);
+      console.log(`[relay] ${role} connected for hostId=${hostId}${clientId ? ` clientId=${clientId}` : ""}`);
     }
 
     socket.isAlive = true;
@@ -155,55 +161,55 @@ export function createRelayServer({ port = 3000, host = "0.0.0.0", verbose = fal
       }
 
       if (role === "client") {
-        if (!["command", "cancel", "input", "resize"].includes(message.type)) {
-          return safeSend(socket, { type: "error", message: "client can only send type=command|cancel|input|resize" });
+        if (!["input", "resize"].includes(message.type)) {
+          return safeSend(socket, { type: "error", message: "client can only send type=input|resize" });
         }
 
         if (!record.hostSocket || record.hostSocket.readyState !== 1) {
           return safeSend(socket, { type: "error", message: "host disconnected" });
         }
 
-        if (message.type === "command") {
-          safeSend(record.hostSocket, {
-            type: "command",
-            command: String(message.command || ""),
-            requestId: message.requestId || randomUUID(),
-            sentAt: Date.now()
-          });
-          return;
-        }
-
-        safeSend(record.hostSocket, {
-          type: "cancel",
-          requestId: String(message.requestId || "")
-        });
+        safeSend(record.hostSocket, { ...message, clientId });
         return;
       }
 
       if (role === "host") {
-        if (!["stdout", "stderr", "exit", "system", "output"].includes(message.type)) {
+        if (!["output", "exit", "system"].includes(message.type)) {
           return safeSend(socket, { type: "error", message: "host sent unsupported message type" });
         }
 
-        if (record.clientSocket && record.clientSocket.readyState === 1) {
-          safeSend(record.clientSocket, message);
+        const targetClientId = String(message.clientId || "");
+        if (!targetClientId) return;
+
+        const target = record.clientSockets.get(targetClientId);
+        if (!target || target.readyState !== 1) {
+          record.clientSockets.delete(targetClientId);
+          return;
         }
+
+        safeSend(target, message);
       }
     });
 
     socket.on("close", () => {
       if (role === "host" && record.hostSocket === socket) {
         record.hostSocket = null;
-        safeSend(record.clientSocket, { type: "system", message: "host disconnected" });
+        for (const [id, clientSocket] of record.clientSockets.entries()) {
+          if (clientSocket.readyState !== 1) {
+            record.clientSockets.delete(id);
+            continue;
+          }
+          safeSend(clientSocket, { type: "system", message: "host disconnected", clientId: id });
+        }
       }
 
-      if (role === "client" && record.clientSocket === socket) {
-        record.clientSocket = null;
-        safeSend(record.hostSocket, { type: "system", message: "client disconnected" });
+      if (role === "client" && clientId) {
+        record.clientSockets.delete(clientId);
+        safeSend(record.hostSocket, { type: "system", message: "client disconnected", clientId });
       }
 
       if (verbose) {
-        console.log(`[relay] ${role} disconnected for hostId=${hostId}`);
+        console.log(`[relay] ${role} disconnected for hostId=${hostId}${clientId ? ` clientId=${clientId}` : ""}`);
       }
     });
   });

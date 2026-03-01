@@ -1,6 +1,6 @@
 # Terminal Tool Relay
 
-A Node.js CLI that lets a **Host** expose a shell through a **Website/Relay API**, and lets a **Client** connect remotely to run commands.
+A Node.js CLI that lets a **Host** expose a real PTY shell through a **Website/Relay API**, and lets one or more **Clients** connect remotely to use an interactive terminal over WebSocket.
 
 ## 🚨 Critical warning for hosts
 
@@ -15,25 +15,48 @@ That user can run commands and access files your host user can access.
 
 ---
 
-## How it works
+## What changed (PTY rewrite)
 
-- Host ➜ Website/Relay ➜ Client
-- Client ➜ Website/Relay ➜ Host
+This project now uses **node-pty** end-to-end for real terminal behavior:
 
-The relay server is stateless/in-memory for host auth and websocket routing, and now serves a custom landing page from `website/`:
+- ✅ Real TTY features (colors, cursor movement, vim, nano, interactive prompts)
+- ✅ Cross-platform shell selection
+  - Windows: `powershell.exe`
+  - Linux/macOS: `$SHELL` or `bash`
+- ✅ Full duplex stream protocol (`input` / `resize` / `output` / `exit`)
+- ✅ Raw key streaming from client (`stdin.setRawMode(true)` when TTY)
+- ✅ Correct Ctrl+C behavior (forwarded to PTY instead of killing client in interactive mode)
+- ✅ Multiple sessions: each connected client gets an isolated PTY instance on host
 
-- `POST /api/register-host` to register host credentials
-- `GET /api/hosts/:hostId` for status
-- `WS /ws/host` for host connection
-- `WS /ws/client` for client connection
+---
+
+## WebSocket protocol
+
+Client → Server:
+
+```json
+{ "type": "input", "data": "<raw keystrokes>" }
+```
+
+```json
+{ "type": "resize", "cols": 120, "rows": 30 }
+```
+
+Server/Host → Client:
+
+```json
+{ "type": "output", "data": "<terminal output>", "clientId": "..." }
+```
+
+```json
+{ "type": "exit", "code": 0, "clientId": "..." }
+```
 
 ---
 
 ## Quick setup tutorial (Website + Host + Client)
 
-## 1) Install on all machines
-
-On website/relay machine and any machine running CLI:
+### 1) Install on all machines
 
 ```bash
 npm install
@@ -47,9 +70,7 @@ If you prefer without global link:
 node src/cli.js --help
 ```
 
-## 2) Website/Relay setup
-
-On the machine that will be public or reachable by both host and client:
+### 2) Website/Relay setup
 
 ```bash
 terminal-tool server --host 0.0.0.0 --port 3000
@@ -62,44 +83,25 @@ open http://127.0.0.1:3000
 curl http://127.0.0.1:3000/health
 ```
 
-Expected response:
-
-```json
-{"ok":true,"hosts":0}
-```
-
-If hosted publicly, open firewall/security-group for the chosen port.
-
-## 3) Host setup
-
-On the host machine (the machine whose terminal will be shared):
+### 3) Host setup
 
 ```bash
 terminal-tool host \
   --server http://YOUR_RELAY_IP:3000 \
   --username hostUser \
   --password "superSecret" \
-  --cwd /path/to/exposed/folder
+  --cwd /path/to/exposed/folder \
+  --sandbox-dir /path/to/exposed
 ```
 
-You will see a warning banner and then a generated `hostId`.
-Share these with the client:
+Share with client:
 
 - `hostId`
 - `username`
 - `password`
 - relay URL
 
-### Host best practices
-
-- Use a dedicated local account with minimal permissions.
-- Keep `--cwd` limited to a safe/test directory.
-- Do not run host mode as root (blocked unless explicitly overridden).
-- Rotate credentials frequently.
-
-## 4) Client setup
-
-On client machine:
+### 4) Client setup
 
 ```bash
 terminal-tool client \
@@ -109,44 +111,23 @@ terminal-tool client \
   --password "superSecret"
 ```
 
-Then type commands and press Enter.
-
-Example session:
-
-```bash
-pwd
-ls -la
-cat README.md
-```
-
-Output streams back from host terminal.
-
-### Canceling a running command
-
-- Press `Ctrl+C` once to request cancellation of the last command.
-- Press `Ctrl+C` again (when no active command) to disconnect.
+In interactive TTY mode, each keypress is streamed immediately.
 
 ---
 
-## Upgrade notes (what was improved)
+## Security notes
 
-- Added websocket heartbeat/ping cleanup for stale sessions.
-- Added websocket payload cap (`1MB`) to reduce abuse risk.
-- Added host root-protection (`host` refuses root unless `--dangerously-allow-root`).
-- Added client command cancellation flow (`cancel` messages).
-- Improved operational documentation for website/host/client setup.
+- Host mode refuses root by default (unless `--dangerously-allow-root`).
+- Use `--sandbox-dir` to constrain the exposed working tree.
+- This tool still exposes shell access; use isolated users/containers and least privilege.
 
 ---
 
-## Production hardening checklist (recommended)
-
-This project is demo-grade by default. Before production:
+## Production hardening checklist
 
 - Put relay behind HTTPS/WSS only.
-- Add real auth (tokens/JWT/expiring sessions), not static credentials.
+- Add strong auth (expiring tokens/JWT), not static credentials.
 - Add rate limits + brute-force lockouts.
-- Add audit logs for all executed commands.
-- Add command allowlists/denylists.
+- Add audit logs for all terminal sessions.
 - Add per-host ACLs and IP allowlists.
-- Store secrets hashed, not plaintext in memory.
-
+- Store credentials securely (not plaintext).
