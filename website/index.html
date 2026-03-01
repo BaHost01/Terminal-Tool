@@ -7,23 +7,55 @@
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <main class="container">
-      <h1>Terminal Tool Relay</h1>
-      <p class="subtitle">Custom website served from the dedicated <code>website/</code> folder.</p>
+    <main class="page">
+      <section class="hero card">
+        <p class="kicker">Terminal Tool</p>
+        <h1>Realtime shell relay, redesigned for clarity.</h1>
+        <p class="subtitle">
+          Monitor relay health, inspect host capacity, and jump into API workflows from one polished dashboard.
+        </p>
 
-      <section class="card">
-        <h2>Relay status</h2>
-        <p id="health">Loading health data...</p>
+        <div class="metric-grid">
+          <article class="metric">
+            <p class="metric-label">Relay status</p>
+            <p id="health" class="metric-value">Loading...</p>
+          </article>
+          <article class="metric">
+            <p class="metric-label">Host inventory</p>
+            <p id="host-count" class="metric-value">Checking...</p>
+          </article>
+          <article class="metric">
+            <p class="metric-label">Last updated</p>
+            <p id="updated-at" class="metric-value">--</p>
+          </article>
+        </div>
+
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="/health">Open health endpoint</a>
+          <a class="btn btn-secondary" href="https://github.com" target="_blank" rel="noreferrer">View docs template</a>
+        </div>
       </section>
 
-      <section class="card">
-        <h2>API shortcuts</h2>
-        <ul>
-          <li><code>GET /health</code></li>
-          <li><code>POST /api/register-host</code></li>
-          <li><code>GET /api/hosts/:hostId</code></li>
-          <li><code>WS /ws/host</code> and <code>WS /ws/client</code></li>
-        </ul>
+      <section class="card api-section">
+        <h2>Relay API quick reference</h2>
+        <div class="api-grid">
+          <div class="api-item">
+            <p class="api-method get">GET</p>
+            <code>/health</code>
+          </div>
+          <div class="api-item">
+            <p class="api-method post">POST</p>
+            <code>/api/register-host</code>
+          </div>
+          <div class="api-item">
+            <p class="api-method get">GET</p>
+            <code>/api/hosts/:hostId</code>
+          </div>
+          <div class="api-item">
+            <p class="api-method ws">WS</p>
+            <code>/ws/host · /ws/client</code>
+          </div>
+        </div>
       </section>
     </main>
 
