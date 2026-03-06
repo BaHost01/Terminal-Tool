@@ -123,6 +123,20 @@ The client now has Termux-aware behavior:
 
 No extra flags are required; run the same `terminal-tool client` command in Termux.
 
+### Termux install troubleshooting (`node-pty` build error)
+
+`node-pty` is now an **optional dependency** so client/server flows can install even if native PTY build tooling is missing.
+
+If you need to run `terminal-tool host` on Termux, install Android build prerequisites and set `android_ndk_path` before reinstalling optional dependencies:
+
+```bash
+pkg install ndk-sysroot clang make python
+export android_ndk_path=$PREFIX/opt/ndk
+npm install --include=optional
+```
+
+If you only use relay server/client on Termux, a normal `npm install` is enough.
+
 ---
 
 ## Security notes
