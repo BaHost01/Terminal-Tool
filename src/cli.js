@@ -9,6 +9,7 @@ import pty from "node-pty";
 import { createRelayServer } from "./server.js";
 
 const IS_WINDOWS = process.platform === "win32";
+const IS_TERMUX = Boolean(process.env.TERMUX_VERSION) || (process.platform === "linux" && String(process.env.PREFIX || "").includes("com.termux"));
 
 function relayUrl(baseUrl, routePath, params) {
   const parsed = new URL(baseUrl);
@@ -160,6 +161,10 @@ function connectClient({ server, hostId, username, password }) {
   const interactive = Boolean(process.stdin.isTTY && process.stdout.isTTY);
   let teardownInput = () => {};
 
+  if (IS_TERMUX && !process.env.TERM) {
+    process.env.TERM = "xterm-256color";
+  }
+
   const sendResize = () => {
     if (ws.readyState !== WebSocket.OPEN) return;
     ws.send(JSON.stringify({
@@ -187,11 +192,13 @@ function connectClient({ server, hostId, username, password }) {
 
     process.stdin.on("data", onData);
     process.stdout.on("resize", onResize);
+    process.on("SIGWINCH", onResize);
     sendResize();
 
     return () => {
       process.stdin.off("data", onData);
       process.stdout.off("resize", onResize);
+      process.off("SIGWINCH", onResize);
       if (typeof process.stdin.setRawMode === "function") {
         process.stdin.setRawMode(false);
       }
@@ -215,6 +222,9 @@ function connectClient({ server, hostId, username, password }) {
 
   ws.on("open", () => {
     console.log(`Connected to host ${hostId}.`);
+    if (IS_TERMUX) {
+      console.log("[client] Termux environment detected; enabled terminal compatibility mode.");
+    }
     teardownInput = interactive ? setupInteractiveInput() : setupLineInput();
   });
 
