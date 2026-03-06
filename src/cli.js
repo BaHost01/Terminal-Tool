@@ -2,10 +2,8 @@
 
 import { Command } from "commander";
 import { WebSocket } from "ws";
-import { randomUUID } from "node:crypto";
 import os from "node:os";
 import path from "node:path";
-import pty from "node-pty";
 import { createRelayServer } from "./server.js";
 
 const IS_WINDOWS = process.platform === "win32";
@@ -71,7 +69,7 @@ function connectHost({ server, hostId, username, password, shell, cwd, sandboxDi
   const createSession = (clientId) => {
     if (sessions.has(clientId)) return sessions.get(clientId);
 
-    const proc = pty.spawn(shell, [], {
+    const proc = ptyRuntime.spawn(shell, [], {
       name: "xterm-256color",
       cols: 120,
       rows: 30,
@@ -154,6 +152,27 @@ function connectHost({ server, hostId, username, password, shell, cwd, sandboxDi
     console.error(`Host connection error: ${err.message}`);
     process.exit(1);
   });
+}
+
+let ptyRuntime = null;
+async function ensurePtyRuntime() {
+  if (ptyRuntime) return ptyRuntime;
+  try {
+    ptyRuntime = await import("node-pty");
+    return ptyRuntime;
+  } catch (error) {
+    throw new Error(
+      [
+        "Host mode requires the optional dependency 'node-pty', but it could not be loaded.",
+        `Reason: ${error.message}`,
+        "If you are using Termux, install the Android NDK package and set android_ndk_path before reinstalling.",
+        "Example:",
+        "  pkg install ndk-sysroot clang make python",
+        "  export android_ndk_path=$PREFIX/opt/ndk",
+        "  npm install --include=optional"
+      ].join("\n")
+    );
+  }
 }
 
 function connectClient({ server, hostId, username, password }) {
@@ -294,6 +313,7 @@ program
 
     const { cwd, sandbox } = sanitizeSandboxDir(options.cwd, options.sandboxDir);
     const shell = resolveShell(options.shell);
+    await ensurePtyRuntime();
 
     const registration = await registerHost({
       server: options.server,
