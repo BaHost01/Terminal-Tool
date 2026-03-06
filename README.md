@@ -113,6 +113,16 @@ terminal-tool client \
 
 In interactive TTY mode, each keypress is streamed immediately.
 
+### Termux client support
+
+The client now has Termux-aware behavior:
+
+- Detects Termux automatically using `TERMUX_VERSION`/`PREFIX`
+- Sets `TERM=xterm-256color` when Termux does not export a TERM value
+- Forwards resize events using both stdout resize hooks and `SIGWINCH`
+
+No extra flags are required; run the same `terminal-tool client` command in Termux.
+
 ---
 
 ## Security notes
