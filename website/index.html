@@ -10,9 +10,9 @@
     <main class="page">
       <section class="hero card">
         <p class="kicker">Terminal Tool</p>
-        <h1>Realtime shell relay, redesigned for clarity.</h1>
+        <h1>Faster relay. Lower ping. Better control.</h1>
         <p class="subtitle">
-          Monitor relay health, inspect host capacity, and connect to an exposed host terminal directly from the dashboard.
+          A refreshed control center for host visibility, Termux X11 permission awareness, and a smoother web client workflow.
         </p>
 
         <div class="metric-grid">
@@ -25,6 +25,10 @@
             <p id="host-count" class="metric-value">Checking...</p>
           </article>
           <article class="metric">
+            <p class="metric-label">Measured ping</p>
+            <p id="ping-ms" class="metric-value">-- ms</p>
+          </article>
+          <article class="metric">
             <p class="metric-label">Last updated</p>
             <p id="updated-at" class="metric-value">--</p>
           </article>
@@ -32,50 +36,44 @@
 
         <div class="hero-actions">
           <a class="btn btn-primary" href="/health">Open health endpoint</a>
-          <a class="btn btn-secondary" href="https://github.com" target="_blank" rel="noreferrer">View docs template</a>
+          <a class="btn btn-secondary" href="/api/tos">Read TOS JSON</a>
         </div>
       </section>
 
-      <section class="card api-section">
-        <h2>Relay API quick reference</h2>
-        <div class="api-grid">
-          <div class="api-item">
-            <p class="api-method get">GET</p>
-            <code>/health</code>
+      <section class="card split-grid">
+        <div>
+          <h2>Relay API quick reference</h2>
+          <div class="api-grid">
+            <div class="api-item"><p class="api-method get">GET</p><code>/health</code></div>
+            <div class="api-item"><p class="api-method post">POST</p><code>/api/register-host</code></div>
+            <div class="api-item"><p class="api-method patch">PATCH</p><code>/api/hosts/:hostId/settings</code></div>
+            <div class="api-item"><p class="api-method get">GET</p><code>/api/hosts/:hostId</code></div>
+            <div class="api-item"><p class="api-method ws">WS</p><code>/ws/host · /ws/client</code></div>
           </div>
-          <div class="api-item">
-            <p class="api-method post">POST</p>
-            <code>/api/register-host</code>
-          </div>
-          <div class="api-item">
-            <p class="api-method get">GET</p>
-            <code>/api/hosts/:hostId</code>
-          </div>
-          <div class="api-item">
-            <p class="api-method ws">WS</p>
-            <code>/ws/host · /ws/client</code>
-          </div>
+        </div>
+
+        <div class="tos-box">
+          <h2>Terms of service highlights</h2>
+          <ul id="tos-list">
+            <li>Loading terms...</li>
+          </ul>
         </div>
       </section>
 
       <section class="card terminal-section">
         <div class="terminal-header">
-          <h2>Web terminal client</h2>
-          <p class="terminal-subtitle">Connect as a relay client and send shell commands from this page.</p>
+          <h2>Upgraded web client</h2>
+          <p class="terminal-subtitle">Connect quickly and run preset commands with one click.</p>
         </div>
 
         <form id="terminal-form" class="terminal-form" autocomplete="off">
-          <label>
-            Host ID
-            <input id="host-id" name="hostId" type="text" required placeholder="Host ID from register-host" />
-          </label>
-          <label>
-            Username
-            <input id="username" name="username" type="text" required placeholder="Host username" />
-          </label>
-          <label>
-            Password
-            <input id="password" name="password" type="password" required value="G9818KLN" />
+          <label>Host ID <input id="host-id" name="hostId" type="text" required placeholder="Host ID" /></label>
+          <label>Username <input id="username" name="username" type="text" required placeholder="Host username" /></label>
+          <label>Password <input id="password" name="password" type="password" required value="G9818KLN" /></label>
+
+          <label class="checkbox">
+            <input id="accept-tos" type="checkbox" />
+            I accept the Terms of Service before opening a terminal session.
           </label>
 
           <div class="terminal-actions">
@@ -84,12 +82,22 @@
           </div>
         </form>
 
-        <p id="terminal-status" class="terminal-status">Disconnected.</p>
+        <div class="pill-row">
+          <p id="terminal-status" class="terminal-status">Disconnected.</p>
+          <p id="host-settings" class="host-settings">Host settings unknown.</p>
+        </div>
+
+        <div class="quick-actions" id="quick-actions">
+          <button data-command="pwd" class="chip">pwd</button>
+          <button data-command="ls -la" class="chip">ls -la</button>
+          <button data-command="whoami" class="chip">whoami</button>
+          <button data-command="top -n 1" class="chip">top snapshot</button>
+        </div>
 
         <pre id="terminal-output" class="terminal-output" aria-live="polite"></pre>
 
         <form id="command-form" class="command-form" autocomplete="off">
-          <input id="command-input" type="text" placeholder="Type command and press Enter (e.g. ls -la)" disabled />
+          <input id="command-input" type="text" placeholder="Type command and press Enter" disabled />
           <button id="send-command" type="submit" class="btn btn-primary" disabled>Send</button>
         </form>
       </section>
