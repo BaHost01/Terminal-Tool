@@ -15,6 +15,23 @@ That user can run commands and access files your host user can access.
 
 ---
 
+
+## New in this upgrade
+
+- Improved web dashboard design with a cleaner terminal client workflow.
+- Health ping measurement in the web UI for faster relay diagnostics.
+- Terms of Service endpoint (`GET /api/tos`) and UI display before connection.
+- Host settings API (`PATCH /api/hosts/:hostId/settings`) for performance mode and Termux X11/UI visibility controls.
+- Added Python host utility: `tools/host_control.py`.
+
+### Python host settings utility
+
+```bash
+python tools/host_control.py --server http://127.0.0.1:3000 tos
+python tools/host_control.py --server http://127.0.0.1:3000 register   --username hostUser --password superSecret   --performance-mode turbo --allow-ui-viewing --termux-x11
+python tools/host_control.py --server http://127.0.0.1:3000 update-settings   --host-id YOUR_HOST_ID --username hostUser --password superSecret   --performance-mode eco --no-low-latency --no-allow-ui-viewing
+```
+
 ## What changed (PTY rewrite)
 
 This project now uses **node-pty** end-to-end for real terminal behavior:
