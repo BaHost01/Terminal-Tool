@@ -1,0 +1,84 @@
+syntax = "proto3";
+
+package terminal;
+
+// Client -> Server messages
+message ClientMessage {
+  oneof payload {
+    AuthRequest auth_request = 1;
+    RegisterHostRequest register_host = 2;
+    PtyInput pty_input = 3;
+    PtyResize pty_resize = 4;
+  }
+  string client_id = 10; // Injected by relay when forwarding to host
+}
+
+// Server -> Client/Host messages
+message ServerMessage {
+  oneof payload {
+    AuthResponse auth_response = 1;
+    RegisterHostResponse register_host_response = 2;
+    PtyOutput pty_output = 3;
+    PtyExit pty_exit = 4;
+    SystemMessage system_message = 5;
+    ErrorMessage error_message = 6;
+  }
+}
+
+// Host -> Server messages
+message HostMessage {
+  oneof payload {
+    AuthRequest auth_request = 1;
+    RegisterHostRequest register_host = 2;
+    PtyOutput pty_output = 3;
+    PtyExit pty_exit = 4;
+  }
+}
+
+message AuthRequest {
+  string host_id = 1;
+  string token = 2;
+}
+
+message AuthResponse {
+  bool ok = 1;
+  string error = 2;
+}
+
+message RegisterHostRequest {
+  string host_id = 1;
+  string password = 2;
+}
+
+message RegisterHostResponse {
+  bool ok = 1;
+  string token = 2;
+  string error = 3;
+}
+
+message PtyInput {
+  string data = 1;
+}
+
+message PtyResize {
+  uint32 cols = 1;
+  uint32 rows = 2;
+}
+
+message PtyOutput {
+  string data = 1;
+  string client_id = 2;
+}
+
+message PtyExit {
+  int32 code = 1;
+  string client_id = 2;
+}
+
+message SystemMessage {
+  string message = 1;
+}
+
+message ErrorMessage {
+  string message = 1;
+}

@@ -1,0 +1,46 @@
+{
+  "name": "@terminal-tool/cli",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "terminal-tool": "./bin/run.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc -w",
+    "lint": "eslint src",
+    "postpack": "rm -f oclif.manifest.json",
+    "prepack": "oclif manifest && oclif readme"
+  },
+  "oclif": {
+    "bin": "terminal-tool",
+    "dirname": "terminal-tool",
+    "commands": "./dist/commands",
+    "topicSeparator": " ",
+    "topics": {
+      "host": {
+        "description": "Expose local terminal to the relay"
+      },
+      "client": {
+        "description": "Connect to a remote terminal"
+      }
+    }
+  },
+  "dependencies": {
+    "@oclif/core": "^4.0.0",
+    "@terminal-tool/protocol": "workspace:*",
+    "ws": "^8.18.0"
+  },
+  "optionalDependencies": {
+    "node-pty": "^1.1.0"
+  },
+  "devDependencies": {
+    "@oclif/plugin-help": "^6.0.0",
+    "@terminal-tool/config": "workspace:*",
+    "@types/node": "^20.0.0",
+    "@types/ws": "^8.5.10",
+    "oclif": "^4.0.0",
+    "typescript": "^5.5.0"
+  }
+}

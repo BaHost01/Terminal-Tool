@@ -1,28 +1,22 @@
 {
-  "name": "terminal-tool",
-  "version": "1.1.0",
-  "description": "Relay terminal access from a host machine to a remote client through a central API",
-  "type": "module",
-  "bin": {
-    "terminal-tool": "./index.js"
-  },
+  "name": "terminal-tool-monorepo",
+  "version": "2.0.0",
+  "private": true,
   "scripts": {
-    "start": "node index.js server",
-    "check": "node --check index.js && node --check src/cli.js && node --check src/server.js"
+    "build": "pnpm -r run build",
+    "dev": "pnpm -r run dev",
+    "lint": "pnpm -r run lint",
+    "test": "pnpm -r run test"
   },
-  "keywords": [
-    "terminal",
-    "websocket",
-    "relay",
-    "remote-shell"
-  ],
-  "license": "MIT",
-  "dependencies": {
-    "commander": "^12.1.0",
-    "express": "^4.21.2",
-    "ws": "^8.18.0"
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.2.1",
+    "prettier": "^3.3.0",
+    "typescript": "^5.5.0",
+    "typescript-eslint": "^8.59.0"
   },
-  "optionalDependencies": {
-    "node-pty": "^1.1.0"
+  "packageManager": "pnpm@9.5.0",
+  "engines": {
+    "node": ">=20.0.0"
   }
 }
