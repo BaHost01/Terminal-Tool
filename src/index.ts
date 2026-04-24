@@ -1,14 +1,12 @@
 import crypto from 'node:crypto';
 import http from 'node:http';
 import express from 'express';
-import jwt from 'jsonwebtoken';
 import { WebSocket, WebSocketServer } from 'ws';
 import { terminal } from '@terminal-tool/protocol';
 import { TokenService, RelayTokenPayload } from './token-service.js';
 
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0';
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key-do-not-use-in-prod';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
 const DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1495245364872220752/GWu9toshy6xtcHlhF08r8WKoGSrbLl3BnXyzpCjy7XsIItYeIthz9qSpGJhKMQcD4uCP";
 
