@@ -57,10 +57,10 @@ A production-ready relay server is also available at the root level.
 - **Publishing:** Automatic publishing to PyPI via GitHub Actions when a version tag (`v*`) is pushed. Uses the `PYPI` repository secret.
 
 ### Mobile App (`mobileapp`)
-- **Framework:** React Native (Expo).
+- **Framework:** Android Native (Kotlin + Jetpack Compose).
 - **Features:** Termux-like terminal, remote PC screen sharing, togglable Admin mode.
-- **Builds:** Automated Android APK generation via GitHub Actions (`.github/workflows/mobile-build.yml`).
-- **Development:** Run `npm run android` or `npm run ios` inside the `mobileapp` directory.
+- **Builds:** Automated Android APK generation via GitHub Actions (`.github/workflows/mobile-build.yml`) using Gradle.
+- **Development:** Open the `mobileapp` directory in Android Studio and run.
 
 ## Development Conventions
 

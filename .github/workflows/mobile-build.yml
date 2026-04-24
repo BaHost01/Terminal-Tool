@@ -6,7 +6,6 @@ on:
     branches: [ main ]
     paths:
       - 'mobileapp/**'
-      - 'packages/protocol/**'
 
 jobs:
   build:
@@ -21,30 +20,15 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-          cache-dependency-path: 'mobileapp/package-lock.json'
-
-      - name: Install dependencies
-        working-directory: mobileapp
-        run: npm install
-
-      - name: Install Expo CLI
-        run: npm install -g expo-cli
-
-      - name: Prebuild Native Files
-        working-directory: mobileapp
-        run: npx expo prebuild --platform android --no-install
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
 
       - name: Build Android Debug APK
-        working-directory: mobileapp/android
-        run: ./gradlew assembleDebug --no-daemon
+        working-directory: mobileapp
+        run: gradle assembleDebug --no-daemon
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: terminal-tool-debug-apk
-          path: mobileapp/android/app/build/outputs/apk/debug/app-debug.apk
+          path: mobileapp/app/build/outputs/apk/debug/app-debug.apk
