@@ -33,7 +33,6 @@ fun TerminalToolTheme(content: @Composable () -> Unit) {
     )
 }
 
-@OptApi
 @Composable
 fun MainScreen() {
     var serverUrl by remember { mutableStateOf("https://terminal-tool.onrender.com") }
