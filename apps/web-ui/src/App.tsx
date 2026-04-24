@@ -33,6 +33,7 @@ interface HostItem {
   lastSeenAt: string | null;
   lastClientAt: string | null;
   settings: HostSettings;
+  isAdmin?: boolean;
 }
 
 interface HostsResponse {
@@ -53,6 +54,7 @@ interface SessionState {
   hostId: string;
   displayName: string;
   token: string;
+  screenEnabled?: boolean;
 }
 
 function getDefaultServer() {

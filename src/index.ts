@@ -27,6 +27,7 @@ interface HostRecord {
   lastSeenAt: string | null;
   lastClientAt: string | null;
   settings: HostSettings;
+  isAdmin: boolean;
 }
 
 const app = express();
@@ -74,6 +75,7 @@ function getHost(hostId: string): HostRecord {
     lastSeenAt: null,
     lastClientAt: null,
     settings: createDefaultSettings(hostId),
+    isAdmin: false,
   };
   hosts.set(hostId, created);
   return created;
@@ -88,6 +90,7 @@ function summarizeHost(host: HostRecord) {
     lastSeenAt: host.lastSeenAt,
     lastClientAt: host.lastClientAt,
     settings: host.settings,
+    isAdmin: host.isAdmin,
   };
 }
 
@@ -236,6 +239,7 @@ wss.on('connection', (socket: WebSocket, req) => {
             currentHostId = hostMessage.registerHost.hostId || crypto.randomUUID();
             const host = getHost(currentHostId);
             host.lastSeenAt = nowIso();
+            host.isAdmin = Boolean(hostMessage.registerHost.runAsAdmin);
 
             if (host.hostSocket && host.hostSocket !== socket) {
               sendSystemMessage(host.hostSocket, 'Another host session replaced this connection');
@@ -249,6 +253,7 @@ wss.on('connection', (socket: WebSocket, req) => {
               registerHostResponse: {
                 ok: true,
                 token: token,
+                isAdmin: host.isAdmin,
               },
             });
             sendSystemMessage(socket, `Host ${currentHostId} registered`);
@@ -319,6 +324,12 @@ wss.on('connection', (socket: WebSocket, req) => {
           for (const clientSocket of host.clientSockets.values()) {
             sendServerMessage(clientSocket, { ptyExit: hostMessage.ptyExit });
           }
+        }
+      }
+
+      if (hostMessage.screenFrame) {
+        for (const clientSocket of host.clientSockets.values()) {
+          sendServerMessage(clientSocket, { screenFrame: hostMessage.screenFrame });
         }
       }
       return;
@@ -399,7 +410,7 @@ wss.on('connection', (socket: WebSocket, req) => {
       return;
     }
 
-    if (clientMessage.ptyInput || clientMessage.ptyResize) {
+    if (clientMessage.ptyInput || clientMessage.ptyResize || clientMessage.toggleScreen || clientMessage.toggleAdmin) {
       clientMessage.clientId = clientId;
       host.hostSocket.send(terminal.ClientMessage.encode(clientMessage).finish());
     }

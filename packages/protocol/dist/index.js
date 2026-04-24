@@ -26,6 +26,8 @@ export const terminal = $root.terminal = (() => {
          * @property {terminal.IRegisterHostRequest|null} [registerHost] ClientMessage registerHost
          * @property {terminal.IPtyInput|null} [ptyInput] ClientMessage ptyInput
          * @property {terminal.IPtyResize|null} [ptyResize] ClientMessage ptyResize
+         * @property {terminal.IToggleScreenRequest|null} [toggleScreen] ClientMessage toggleScreen
+         * @property {terminal.IToggleAdminRequest|null} [toggleAdmin] ClientMessage toggleAdmin
          * @property {string|null} [clientId] ClientMessage clientId
          */
 
@@ -77,6 +79,22 @@ export const terminal = $root.terminal = (() => {
         ClientMessage.prototype.ptyResize = null;
 
         /**
+         * ClientMessage toggleScreen.
+         * @member {terminal.IToggleScreenRequest|null|undefined} toggleScreen
+         * @memberof terminal.ClientMessage
+         * @instance
+         */
+        ClientMessage.prototype.toggleScreen = null;
+
+        /**
+         * ClientMessage toggleAdmin.
+         * @member {terminal.IToggleAdminRequest|null|undefined} toggleAdmin
+         * @memberof terminal.ClientMessage
+         * @instance
+         */
+        ClientMessage.prototype.toggleAdmin = null;
+
+        /**
          * ClientMessage clientId.
          * @member {string} clientId
          * @memberof terminal.ClientMessage
@@ -89,12 +107,12 @@ export const terminal = $root.terminal = (() => {
 
         /**
          * ClientMessage payload.
-         * @member {"authRequest"|"registerHost"|"ptyInput"|"ptyResize"|undefined} payload
+         * @member {"authRequest"|"registerHost"|"ptyInput"|"ptyResize"|"toggleScreen"|"toggleAdmin"|undefined} payload
          * @memberof terminal.ClientMessage
          * @instance
          */
         Object.defineProperty(ClientMessage.prototype, "payload", {
-            get: $util.oneOfGetter($oneOfFields = ["authRequest", "registerHost", "ptyInput", "ptyResize"]),
+            get: $util.oneOfGetter($oneOfFields = ["authRequest", "registerHost", "ptyInput", "ptyResize", "toggleScreen", "toggleAdmin"]),
             set: $util.oneOfSetter($oneOfFields)
         });
 
@@ -130,6 +148,10 @@ export const terminal = $root.terminal = (() => {
                 $root.terminal.PtyInput.encode(message.ptyInput, writer.uint32(/* id 3, wireType 2 =*/26).fork()).ldelim();
             if (message.ptyResize != null && Object.hasOwnProperty.call(message, "ptyResize"))
                 $root.terminal.PtyResize.encode(message.ptyResize, writer.uint32(/* id 4, wireType 2 =*/34).fork()).ldelim();
+            if (message.toggleScreen != null && Object.hasOwnProperty.call(message, "toggleScreen"))
+                $root.terminal.ToggleScreenRequest.encode(message.toggleScreen, writer.uint32(/* id 5, wireType 2 =*/42).fork()).ldelim();
+            if (message.toggleAdmin != null && Object.hasOwnProperty.call(message, "toggleAdmin"))
+                $root.terminal.ToggleAdminRequest.encode(message.toggleAdmin, writer.uint32(/* id 6, wireType 2 =*/50).fork()).ldelim();
             if (message.clientId != null && Object.hasOwnProperty.call(message, "clientId"))
                 writer.uint32(/* id 10, wireType 2 =*/82).string(message.clientId);
             return writer;
@@ -182,6 +204,14 @@ export const terminal = $root.terminal = (() => {
                     }
                 case 4: {
                         message.ptyResize = $root.terminal.PtyResize.decode(reader, reader.uint32());
+                        break;
+                    }
+                case 5: {
+                        message.toggleScreen = $root.terminal.ToggleScreenRequest.decode(reader, reader.uint32());
+                        break;
+                    }
+                case 6: {
+                        message.toggleAdmin = $root.terminal.ToggleAdminRequest.decode(reader, reader.uint32());
                         break;
                     }
                 case 10: {
@@ -262,6 +292,26 @@ export const terminal = $root.terminal = (() => {
                         return "ptyResize." + error;
                 }
             }
+            if (message.toggleScreen != null && message.hasOwnProperty("toggleScreen")) {
+                if (properties.payload === 1)
+                    return "payload: multiple values";
+                properties.payload = 1;
+                {
+                    let error = $root.terminal.ToggleScreenRequest.verify(message.toggleScreen);
+                    if (error)
+                        return "toggleScreen." + error;
+                }
+            }
+            if (message.toggleAdmin != null && message.hasOwnProperty("toggleAdmin")) {
+                if (properties.payload === 1)
+                    return "payload: multiple values";
+                properties.payload = 1;
+                {
+                    let error = $root.terminal.ToggleAdminRequest.verify(message.toggleAdmin);
+                    if (error)
+                        return "toggleAdmin." + error;
+                }
+            }
             if (message.clientId != null && message.hasOwnProperty("clientId"))
                 if (!$util.isString(message.clientId))
                     return "clientId: string expected";
@@ -299,6 +349,16 @@ export const terminal = $root.terminal = (() => {
                 if (typeof object.ptyResize !== "object")
                     throw TypeError(".terminal.ClientMessage.ptyResize: object expected");
                 message.ptyResize = $root.terminal.PtyResize.fromObject(object.ptyResize);
+            }
+            if (object.toggleScreen != null) {
+                if (typeof object.toggleScreen !== "object")
+                    throw TypeError(".terminal.ClientMessage.toggleScreen: object expected");
+                message.toggleScreen = $root.terminal.ToggleScreenRequest.fromObject(object.toggleScreen);
+            }
+            if (object.toggleAdmin != null) {
+                if (typeof object.toggleAdmin !== "object")
+                    throw TypeError(".terminal.ClientMessage.toggleAdmin: object expected");
+                message.toggleAdmin = $root.terminal.ToggleAdminRequest.fromObject(object.toggleAdmin);
             }
             if (object.clientId != null)
                 message.clientId = String(object.clientId);
@@ -339,6 +399,16 @@ export const terminal = $root.terminal = (() => {
                 object.ptyResize = $root.terminal.PtyResize.toObject(message.ptyResize, options);
                 if (options.oneofs)
                     object.payload = "ptyResize";
+            }
+            if (message.toggleScreen != null && message.hasOwnProperty("toggleScreen")) {
+                object.toggleScreen = $root.terminal.ToggleScreenRequest.toObject(message.toggleScreen, options);
+                if (options.oneofs)
+                    object.payload = "toggleScreen";
+            }
+            if (message.toggleAdmin != null && message.hasOwnProperty("toggleAdmin")) {
+                object.toggleAdmin = $root.terminal.ToggleAdminRequest.toObject(message.toggleAdmin, options);
+                if (options.oneofs)
+                    object.payload = "toggleAdmin";
             }
             if (message.clientId != null && message.hasOwnProperty("clientId"))
                 object.clientId = message.clientId;
@@ -386,6 +456,7 @@ export const terminal = $root.terminal = (() => {
          * @property {terminal.IPtyExit|null} [ptyExit] ServerMessage ptyExit
          * @property {terminal.ISystemMessage|null} [systemMessage] ServerMessage systemMessage
          * @property {terminal.IErrorMessage|null} [errorMessage] ServerMessage errorMessage
+         * @property {terminal.IScreenFrame|null} [screenFrame] ServerMessage screenFrame
          */
 
         /**
@@ -451,17 +522,25 @@ export const terminal = $root.terminal = (() => {
          */
         ServerMessage.prototype.errorMessage = null;
 
+        /**
+         * ServerMessage screenFrame.
+         * @member {terminal.IScreenFrame|null|undefined} screenFrame
+         * @memberof terminal.ServerMessage
+         * @instance
+         */
+        ServerMessage.prototype.screenFrame = null;
+
         // OneOf field names bound to virtual getters and setters
         let $oneOfFields;
 
         /**
          * ServerMessage payload.
-         * @member {"authResponse"|"registerHostResponse"|"ptyOutput"|"ptyExit"|"systemMessage"|"errorMessage"|undefined} payload
+         * @member {"authResponse"|"registerHostResponse"|"ptyOutput"|"ptyExit"|"systemMessage"|"errorMessage"|"screenFrame"|undefined} payload
          * @memberof terminal.ServerMessage
          * @instance
          */
         Object.defineProperty(ServerMessage.prototype, "payload", {
-            get: $util.oneOfGetter($oneOfFields = ["authResponse", "registerHostResponse", "ptyOutput", "ptyExit", "systemMessage", "errorMessage"]),
+            get: $util.oneOfGetter($oneOfFields = ["authResponse", "registerHostResponse", "ptyOutput", "ptyExit", "systemMessage", "errorMessage", "screenFrame"]),
             set: $util.oneOfSetter($oneOfFields)
         });
 
@@ -501,6 +580,8 @@ export const terminal = $root.terminal = (() => {
                 $root.terminal.SystemMessage.encode(message.systemMessage, writer.uint32(/* id 5, wireType 2 =*/42).fork()).ldelim();
             if (message.errorMessage != null && Object.hasOwnProperty.call(message, "errorMessage"))
                 $root.terminal.ErrorMessage.encode(message.errorMessage, writer.uint32(/* id 6, wireType 2 =*/50).fork()).ldelim();
+            if (message.screenFrame != null && Object.hasOwnProperty.call(message, "screenFrame"))
+                $root.terminal.ScreenFrame.encode(message.screenFrame, writer.uint32(/* id 7, wireType 2 =*/58).fork()).ldelim();
             return writer;
         };
 
@@ -559,6 +640,10 @@ export const terminal = $root.terminal = (() => {
                     }
                 case 6: {
                         message.errorMessage = $root.terminal.ErrorMessage.decode(reader, reader.uint32());
+                        break;
+                    }
+                case 7: {
+                        message.screenFrame = $root.terminal.ScreenFrame.decode(reader, reader.uint32());
                         break;
                     }
                 default:
@@ -655,6 +740,16 @@ export const terminal = $root.terminal = (() => {
                         return "errorMessage." + error;
                 }
             }
+            if (message.screenFrame != null && message.hasOwnProperty("screenFrame")) {
+                if (properties.payload === 1)
+                    return "payload: multiple values";
+                properties.payload = 1;
+                {
+                    let error = $root.terminal.ScreenFrame.verify(message.screenFrame);
+                    if (error)
+                        return "screenFrame." + error;
+                }
+            }
             return null;
         };
 
@@ -699,6 +794,11 @@ export const terminal = $root.terminal = (() => {
                 if (typeof object.errorMessage !== "object")
                     throw TypeError(".terminal.ServerMessage.errorMessage: object expected");
                 message.errorMessage = $root.terminal.ErrorMessage.fromObject(object.errorMessage);
+            }
+            if (object.screenFrame != null) {
+                if (typeof object.screenFrame !== "object")
+                    throw TypeError(".terminal.ServerMessage.screenFrame: object expected");
+                message.screenFrame = $root.terminal.ScreenFrame.fromObject(object.screenFrame);
             }
             return message;
         };
@@ -746,6 +846,11 @@ export const terminal = $root.terminal = (() => {
                 if (options.oneofs)
                     object.payload = "errorMessage";
             }
+            if (message.screenFrame != null && message.hasOwnProperty("screenFrame")) {
+                object.screenFrame = $root.terminal.ScreenFrame.toObject(message.screenFrame, options);
+                if (options.oneofs)
+                    object.payload = "screenFrame";
+            }
             return object;
         };
 
@@ -788,6 +893,8 @@ export const terminal = $root.terminal = (() => {
          * @property {terminal.IRegisterHostRequest|null} [registerHost] HostMessage registerHost
          * @property {terminal.IPtyOutput|null} [ptyOutput] HostMessage ptyOutput
          * @property {terminal.IPtyExit|null} [ptyExit] HostMessage ptyExit
+         * @property {terminal.IScreenFrame|null} [screenFrame] HostMessage screenFrame
+         * @property {terminal.IHostCapabilities|null} [capabilities] HostMessage capabilities
          */
 
         /**
@@ -837,17 +944,33 @@ export const terminal = $root.terminal = (() => {
          */
         HostMessage.prototype.ptyExit = null;
 
+        /**
+         * HostMessage screenFrame.
+         * @member {terminal.IScreenFrame|null|undefined} screenFrame
+         * @memberof terminal.HostMessage
+         * @instance
+         */
+        HostMessage.prototype.screenFrame = null;
+
+        /**
+         * HostMessage capabilities.
+         * @member {terminal.IHostCapabilities|null|undefined} capabilities
+         * @memberof terminal.HostMessage
+         * @instance
+         */
+        HostMessage.prototype.capabilities = null;
+
         // OneOf field names bound to virtual getters and setters
         let $oneOfFields;
 
         /**
          * HostMessage payload.
-         * @member {"authRequest"|"registerHost"|"ptyOutput"|"ptyExit"|undefined} payload
+         * @member {"authRequest"|"registerHost"|"ptyOutput"|"ptyExit"|"screenFrame"|"capabilities"|undefined} payload
          * @memberof terminal.HostMessage
          * @instance
          */
         Object.defineProperty(HostMessage.prototype, "payload", {
-            get: $util.oneOfGetter($oneOfFields = ["authRequest", "registerHost", "ptyOutput", "ptyExit"]),
+            get: $util.oneOfGetter($oneOfFields = ["authRequest", "registerHost", "ptyOutput", "ptyExit", "screenFrame", "capabilities"]),
             set: $util.oneOfSetter($oneOfFields)
         });
 
@@ -883,6 +1006,10 @@ export const terminal = $root.terminal = (() => {
                 $root.terminal.PtyOutput.encode(message.ptyOutput, writer.uint32(/* id 3, wireType 2 =*/26).fork()).ldelim();
             if (message.ptyExit != null && Object.hasOwnProperty.call(message, "ptyExit"))
                 $root.terminal.PtyExit.encode(message.ptyExit, writer.uint32(/* id 4, wireType 2 =*/34).fork()).ldelim();
+            if (message.screenFrame != null && Object.hasOwnProperty.call(message, "screenFrame"))
+                $root.terminal.ScreenFrame.encode(message.screenFrame, writer.uint32(/* id 5, wireType 2 =*/42).fork()).ldelim();
+            if (message.capabilities != null && Object.hasOwnProperty.call(message, "capabilities"))
+                $root.terminal.HostCapabilities.encode(message.capabilities, writer.uint32(/* id 6, wireType 2 =*/50).fork()).ldelim();
             return writer;
         };
 
@@ -933,6 +1060,14 @@ export const terminal = $root.terminal = (() => {
                     }
                 case 4: {
                         message.ptyExit = $root.terminal.PtyExit.decode(reader, reader.uint32());
+                        break;
+                    }
+                case 5: {
+                        message.screenFrame = $root.terminal.ScreenFrame.decode(reader, reader.uint32());
+                        break;
+                    }
+                case 6: {
+                        message.capabilities = $root.terminal.HostCapabilities.decode(reader, reader.uint32());
                         break;
                     }
                 default:
@@ -1009,6 +1144,26 @@ export const terminal = $root.terminal = (() => {
                         return "ptyExit." + error;
                 }
             }
+            if (message.screenFrame != null && message.hasOwnProperty("screenFrame")) {
+                if (properties.payload === 1)
+                    return "payload: multiple values";
+                properties.payload = 1;
+                {
+                    let error = $root.terminal.ScreenFrame.verify(message.screenFrame);
+                    if (error)
+                        return "screenFrame." + error;
+                }
+            }
+            if (message.capabilities != null && message.hasOwnProperty("capabilities")) {
+                if (properties.payload === 1)
+                    return "payload: multiple values";
+                properties.payload = 1;
+                {
+                    let error = $root.terminal.HostCapabilities.verify(message.capabilities);
+                    if (error)
+                        return "capabilities." + error;
+                }
+            }
             return null;
         };
 
@@ -1043,6 +1198,16 @@ export const terminal = $root.terminal = (() => {
                 if (typeof object.ptyExit !== "object")
                     throw TypeError(".terminal.HostMessage.ptyExit: object expected");
                 message.ptyExit = $root.terminal.PtyExit.fromObject(object.ptyExit);
+            }
+            if (object.screenFrame != null) {
+                if (typeof object.screenFrame !== "object")
+                    throw TypeError(".terminal.HostMessage.screenFrame: object expected");
+                message.screenFrame = $root.terminal.ScreenFrame.fromObject(object.screenFrame);
+            }
+            if (object.capabilities != null) {
+                if (typeof object.capabilities !== "object")
+                    throw TypeError(".terminal.HostMessage.capabilities: object expected");
+                message.capabilities = $root.terminal.HostCapabilities.fromObject(object.capabilities);
             }
             return message;
         };
@@ -1079,6 +1244,16 @@ export const terminal = $root.terminal = (() => {
                 object.ptyExit = $root.terminal.PtyExit.toObject(message.ptyExit, options);
                 if (options.oneofs)
                     object.payload = "ptyExit";
+            }
+            if (message.screenFrame != null && message.hasOwnProperty("screenFrame")) {
+                object.screenFrame = $root.terminal.ScreenFrame.toObject(message.screenFrame, options);
+                if (options.oneofs)
+                    object.payload = "screenFrame";
+            }
+            if (message.capabilities != null && message.hasOwnProperty("capabilities")) {
+                object.capabilities = $root.terminal.HostCapabilities.toObject(message.capabilities, options);
+                if (options.oneofs)
+                    object.payload = "capabilities";
             }
             return object;
         };
@@ -1578,6 +1753,7 @@ export const terminal = $root.terminal = (() => {
          * @interface IRegisterHostRequest
          * @property {string|null} [hostId] RegisterHostRequest hostId
          * @property {string|null} [password] RegisterHostRequest password
+         * @property {boolean|null} [runAsAdmin] RegisterHostRequest runAsAdmin
          */
 
         /**
@@ -1612,6 +1788,14 @@ export const terminal = $root.terminal = (() => {
         RegisterHostRequest.prototype.password = "";
 
         /**
+         * RegisterHostRequest runAsAdmin.
+         * @member {boolean} runAsAdmin
+         * @memberof terminal.RegisterHostRequest
+         * @instance
+         */
+        RegisterHostRequest.prototype.runAsAdmin = false;
+
+        /**
          * Creates a new RegisterHostRequest instance using the specified properties.
          * @function create
          * @memberof terminal.RegisterHostRequest
@@ -1639,6 +1823,8 @@ export const terminal = $root.terminal = (() => {
                 writer.uint32(/* id 1, wireType 2 =*/10).string(message.hostId);
             if (message.password != null && Object.hasOwnProperty.call(message, "password"))
                 writer.uint32(/* id 2, wireType 2 =*/18).string(message.password);
+            if (message.runAsAdmin != null && Object.hasOwnProperty.call(message, "runAsAdmin"))
+                writer.uint32(/* id 3, wireType 0 =*/24).bool(message.runAsAdmin);
             return writer;
         };
 
@@ -1683,6 +1869,10 @@ export const terminal = $root.terminal = (() => {
                         message.password = reader.string();
                         break;
                     }
+                case 3: {
+                        message.runAsAdmin = reader.bool();
+                        break;
+                    }
                 default:
                     reader.skipType(tag & 7);
                     break;
@@ -1724,6 +1914,9 @@ export const terminal = $root.terminal = (() => {
             if (message.password != null && message.hasOwnProperty("password"))
                 if (!$util.isString(message.password))
                     return "password: string expected";
+            if (message.runAsAdmin != null && message.hasOwnProperty("runAsAdmin"))
+                if (typeof message.runAsAdmin !== "boolean")
+                    return "runAsAdmin: boolean expected";
             return null;
         };
 
@@ -1743,6 +1936,8 @@ export const terminal = $root.terminal = (() => {
                 message.hostId = String(object.hostId);
             if (object.password != null)
                 message.password = String(object.password);
+            if (object.runAsAdmin != null)
+                message.runAsAdmin = Boolean(object.runAsAdmin);
             return message;
         };
 
@@ -1762,11 +1957,14 @@ export const terminal = $root.terminal = (() => {
             if (options.defaults) {
                 object.hostId = "";
                 object.password = "";
+                object.runAsAdmin = false;
             }
             if (message.hostId != null && message.hasOwnProperty("hostId"))
                 object.hostId = message.hostId;
             if (message.password != null && message.hasOwnProperty("password"))
                 object.password = message.password;
+            if (message.runAsAdmin != null && message.hasOwnProperty("runAsAdmin"))
+                object.runAsAdmin = message.runAsAdmin;
             return object;
         };
 
@@ -1808,6 +2006,7 @@ export const terminal = $root.terminal = (() => {
          * @property {boolean|null} [ok] RegisterHostResponse ok
          * @property {string|null} [token] RegisterHostResponse token
          * @property {string|null} [error] RegisterHostResponse error
+         * @property {boolean|null} [isAdmin] RegisterHostResponse isAdmin
          */
 
         /**
@@ -1850,6 +2049,14 @@ export const terminal = $root.terminal = (() => {
         RegisterHostResponse.prototype.error = "";
 
         /**
+         * RegisterHostResponse isAdmin.
+         * @member {boolean} isAdmin
+         * @memberof terminal.RegisterHostResponse
+         * @instance
+         */
+        RegisterHostResponse.prototype.isAdmin = false;
+
+        /**
          * Creates a new RegisterHostResponse instance using the specified properties.
          * @function create
          * @memberof terminal.RegisterHostResponse
@@ -1879,6 +2086,8 @@ export const terminal = $root.terminal = (() => {
                 writer.uint32(/* id 2, wireType 2 =*/18).string(message.token);
             if (message.error != null && Object.hasOwnProperty.call(message, "error"))
                 writer.uint32(/* id 3, wireType 2 =*/26).string(message.error);
+            if (message.isAdmin != null && Object.hasOwnProperty.call(message, "isAdmin"))
+                writer.uint32(/* id 4, wireType 0 =*/32).bool(message.isAdmin);
             return writer;
         };
 
@@ -1927,6 +2136,10 @@ export const terminal = $root.terminal = (() => {
                         message.error = reader.string();
                         break;
                     }
+                case 4: {
+                        message.isAdmin = reader.bool();
+                        break;
+                    }
                 default:
                     reader.skipType(tag & 7);
                     break;
@@ -1971,6 +2184,9 @@ export const terminal = $root.terminal = (() => {
             if (message.error != null && message.hasOwnProperty("error"))
                 if (!$util.isString(message.error))
                     return "error: string expected";
+            if (message.isAdmin != null && message.hasOwnProperty("isAdmin"))
+                if (typeof message.isAdmin !== "boolean")
+                    return "isAdmin: boolean expected";
             return null;
         };
 
@@ -1992,6 +2208,8 @@ export const terminal = $root.terminal = (() => {
                 message.token = String(object.token);
             if (object.error != null)
                 message.error = String(object.error);
+            if (object.isAdmin != null)
+                message.isAdmin = Boolean(object.isAdmin);
             return message;
         };
 
@@ -2012,6 +2230,7 @@ export const terminal = $root.terminal = (() => {
                 object.ok = false;
                 object.token = "";
                 object.error = "";
+                object.isAdmin = false;
             }
             if (message.ok != null && message.hasOwnProperty("ok"))
                 object.ok = message.ok;
@@ -2019,6 +2238,8 @@ export const terminal = $root.terminal = (() => {
                 object.token = message.token;
             if (message.error != null && message.hasOwnProperty("error"))
                 object.error = message.error;
+            if (message.isAdmin != null && message.hasOwnProperty("isAdmin"))
+                object.isAdmin = message.isAdmin;
             return object;
         };
 
@@ -3351,6 +3572,929 @@ export const terminal = $root.terminal = (() => {
         };
 
         return ErrorMessage;
+    })();
+
+    terminal.ScreenFrame = (function() {
+
+        /**
+         * Properties of a ScreenFrame.
+         * @memberof terminal
+         * @interface IScreenFrame
+         * @property {Uint8Array|null} [data] ScreenFrame data
+         * @property {number|null} [width] ScreenFrame width
+         * @property {number|null} [height] ScreenFrame height
+         */
+
+        /**
+         * Constructs a new ScreenFrame.
+         * @memberof terminal
+         * @classdesc Represents a ScreenFrame.
+         * @implements IScreenFrame
+         * @constructor
+         * @param {terminal.IScreenFrame=} [properties] Properties to set
+         */
+        function ScreenFrame(properties) {
+            if (properties)
+                for (let keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                    if (properties[keys[i]] != null)
+                        this[keys[i]] = properties[keys[i]];
+        }
+
+        /**
+         * ScreenFrame data.
+         * @member {Uint8Array} data
+         * @memberof terminal.ScreenFrame
+         * @instance
+         */
+        ScreenFrame.prototype.data = $util.newBuffer([]);
+
+        /**
+         * ScreenFrame width.
+         * @member {number} width
+         * @memberof terminal.ScreenFrame
+         * @instance
+         */
+        ScreenFrame.prototype.width = 0;
+
+        /**
+         * ScreenFrame height.
+         * @member {number} height
+         * @memberof terminal.ScreenFrame
+         * @instance
+         */
+        ScreenFrame.prototype.height = 0;
+
+        /**
+         * Creates a new ScreenFrame instance using the specified properties.
+         * @function create
+         * @memberof terminal.ScreenFrame
+         * @static
+         * @param {terminal.IScreenFrame=} [properties] Properties to set
+         * @returns {terminal.ScreenFrame} ScreenFrame instance
+         */
+        ScreenFrame.create = function create(properties) {
+            return new ScreenFrame(properties);
+        };
+
+        /**
+         * Encodes the specified ScreenFrame message. Does not implicitly {@link terminal.ScreenFrame.verify|verify} messages.
+         * @function encode
+         * @memberof terminal.ScreenFrame
+         * @static
+         * @param {terminal.IScreenFrame} message ScreenFrame message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        ScreenFrame.encode = function encode(message, writer) {
+            if (!writer)
+                writer = $Writer.create();
+            if (message.data != null && Object.hasOwnProperty.call(message, "data"))
+                writer.uint32(/* id 1, wireType 2 =*/10).bytes(message.data);
+            if (message.width != null && Object.hasOwnProperty.call(message, "width"))
+                writer.uint32(/* id 2, wireType 0 =*/16).uint32(message.width);
+            if (message.height != null && Object.hasOwnProperty.call(message, "height"))
+                writer.uint32(/* id 3, wireType 0 =*/24).uint32(message.height);
+            return writer;
+        };
+
+        /**
+         * Encodes the specified ScreenFrame message, length delimited. Does not implicitly {@link terminal.ScreenFrame.verify|verify} messages.
+         * @function encodeDelimited
+         * @memberof terminal.ScreenFrame
+         * @static
+         * @param {terminal.IScreenFrame} message ScreenFrame message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        ScreenFrame.encodeDelimited = function encodeDelimited(message, writer) {
+            return this.encode(message, writer).ldelim();
+        };
+
+        /**
+         * Decodes a ScreenFrame message from the specified reader or buffer.
+         * @function decode
+         * @memberof terminal.ScreenFrame
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @param {number} [length] Message length if known beforehand
+         * @returns {terminal.ScreenFrame} ScreenFrame
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        ScreenFrame.decode = function decode(reader, length, error) {
+            if (!(reader instanceof $Reader))
+                reader = $Reader.create(reader);
+            let end = length === undefined ? reader.len : reader.pos + length, message = new $root.terminal.ScreenFrame();
+            while (reader.pos < end) {
+                let tag = reader.uint32();
+                if (tag === error)
+                    break;
+                switch (tag >>> 3) {
+                case 1: {
+                        message.data = reader.bytes();
+                        break;
+                    }
+                case 2: {
+                        message.width = reader.uint32();
+                        break;
+                    }
+                case 3: {
+                        message.height = reader.uint32();
+                        break;
+                    }
+                default:
+                    reader.skipType(tag & 7);
+                    break;
+                }
+            }
+            return message;
+        };
+
+        /**
+         * Decodes a ScreenFrame message from the specified reader or buffer, length delimited.
+         * @function decodeDelimited
+         * @memberof terminal.ScreenFrame
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @returns {terminal.ScreenFrame} ScreenFrame
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        ScreenFrame.decodeDelimited = function decodeDelimited(reader) {
+            if (!(reader instanceof $Reader))
+                reader = new $Reader(reader);
+            return this.decode(reader, reader.uint32());
+        };
+
+        /**
+         * Verifies a ScreenFrame message.
+         * @function verify
+         * @memberof terminal.ScreenFrame
+         * @static
+         * @param {Object.<string,*>} message Plain object to verify
+         * @returns {string|null} `null` if valid, otherwise the reason why it is not
+         */
+        ScreenFrame.verify = function verify(message) {
+            if (typeof message !== "object" || message === null)
+                return "object expected";
+            if (message.data != null && message.hasOwnProperty("data"))
+                if (!(message.data && typeof message.data.length === "number" || $util.isString(message.data)))
+                    return "data: buffer expected";
+            if (message.width != null && message.hasOwnProperty("width"))
+                if (!$util.isInteger(message.width))
+                    return "width: integer expected";
+            if (message.height != null && message.hasOwnProperty("height"))
+                if (!$util.isInteger(message.height))
+                    return "height: integer expected";
+            return null;
+        };
+
+        /**
+         * Creates a ScreenFrame message from a plain object. Also converts values to their respective internal types.
+         * @function fromObject
+         * @memberof terminal.ScreenFrame
+         * @static
+         * @param {Object.<string,*>} object Plain object
+         * @returns {terminal.ScreenFrame} ScreenFrame
+         */
+        ScreenFrame.fromObject = function fromObject(object) {
+            if (object instanceof $root.terminal.ScreenFrame)
+                return object;
+            let message = new $root.terminal.ScreenFrame();
+            if (object.data != null)
+                if (typeof object.data === "string")
+                    $util.base64.decode(object.data, message.data = $util.newBuffer($util.base64.length(object.data)), 0);
+                else if (object.data.length >= 0)
+                    message.data = object.data;
+            if (object.width != null)
+                message.width = object.width >>> 0;
+            if (object.height != null)
+                message.height = object.height >>> 0;
+            return message;
+        };
+
+        /**
+         * Creates a plain object from a ScreenFrame message. Also converts values to other types if specified.
+         * @function toObject
+         * @memberof terminal.ScreenFrame
+         * @static
+         * @param {terminal.ScreenFrame} message ScreenFrame
+         * @param {$protobuf.IConversionOptions} [options] Conversion options
+         * @returns {Object.<string,*>} Plain object
+         */
+        ScreenFrame.toObject = function toObject(message, options) {
+            if (!options)
+                options = {};
+            let object = {};
+            if (options.defaults) {
+                if (options.bytes === String)
+                    object.data = "";
+                else {
+                    object.data = [];
+                    if (options.bytes !== Array)
+                        object.data = $util.newBuffer(object.data);
+                }
+                object.width = 0;
+                object.height = 0;
+            }
+            if (message.data != null && message.hasOwnProperty("data"))
+                object.data = options.bytes === String ? $util.base64.encode(message.data, 0, message.data.length) : options.bytes === Array ? Array.prototype.slice.call(message.data) : message.data;
+            if (message.width != null && message.hasOwnProperty("width"))
+                object.width = message.width;
+            if (message.height != null && message.hasOwnProperty("height"))
+                object.height = message.height;
+            return object;
+        };
+
+        /**
+         * Converts this ScreenFrame to JSON.
+         * @function toJSON
+         * @memberof terminal.ScreenFrame
+         * @instance
+         * @returns {Object.<string,*>} JSON object
+         */
+        ScreenFrame.prototype.toJSON = function toJSON() {
+            return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+        };
+
+        /**
+         * Gets the default type url for ScreenFrame
+         * @function getTypeUrl
+         * @memberof terminal.ScreenFrame
+         * @static
+         * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+         * @returns {string} The default type url
+         */
+        ScreenFrame.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+            if (typeUrlPrefix === undefined) {
+                typeUrlPrefix = "type.googleapis.com";
+            }
+            return typeUrlPrefix + "/terminal.ScreenFrame";
+        };
+
+        return ScreenFrame;
+    })();
+
+    terminal.ToggleScreenRequest = (function() {
+
+        /**
+         * Properties of a ToggleScreenRequest.
+         * @memberof terminal
+         * @interface IToggleScreenRequest
+         * @property {boolean|null} [enabled] ToggleScreenRequest enabled
+         */
+
+        /**
+         * Constructs a new ToggleScreenRequest.
+         * @memberof terminal
+         * @classdesc Represents a ToggleScreenRequest.
+         * @implements IToggleScreenRequest
+         * @constructor
+         * @param {terminal.IToggleScreenRequest=} [properties] Properties to set
+         */
+        function ToggleScreenRequest(properties) {
+            if (properties)
+                for (let keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                    if (properties[keys[i]] != null)
+                        this[keys[i]] = properties[keys[i]];
+        }
+
+        /**
+         * ToggleScreenRequest enabled.
+         * @member {boolean} enabled
+         * @memberof terminal.ToggleScreenRequest
+         * @instance
+         */
+        ToggleScreenRequest.prototype.enabled = false;
+
+        /**
+         * Creates a new ToggleScreenRequest instance using the specified properties.
+         * @function create
+         * @memberof terminal.ToggleScreenRequest
+         * @static
+         * @param {terminal.IToggleScreenRequest=} [properties] Properties to set
+         * @returns {terminal.ToggleScreenRequest} ToggleScreenRequest instance
+         */
+        ToggleScreenRequest.create = function create(properties) {
+            return new ToggleScreenRequest(properties);
+        };
+
+        /**
+         * Encodes the specified ToggleScreenRequest message. Does not implicitly {@link terminal.ToggleScreenRequest.verify|verify} messages.
+         * @function encode
+         * @memberof terminal.ToggleScreenRequest
+         * @static
+         * @param {terminal.IToggleScreenRequest} message ToggleScreenRequest message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        ToggleScreenRequest.encode = function encode(message, writer) {
+            if (!writer)
+                writer = $Writer.create();
+            if (message.enabled != null && Object.hasOwnProperty.call(message, "enabled"))
+                writer.uint32(/* id 1, wireType 0 =*/8).bool(message.enabled);
+            return writer;
+        };
+
+        /**
+         * Encodes the specified ToggleScreenRequest message, length delimited. Does not implicitly {@link terminal.ToggleScreenRequest.verify|verify} messages.
+         * @function encodeDelimited
+         * @memberof terminal.ToggleScreenRequest
+         * @static
+         * @param {terminal.IToggleScreenRequest} message ToggleScreenRequest message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        ToggleScreenRequest.encodeDelimited = function encodeDelimited(message, writer) {
+            return this.encode(message, writer).ldelim();
+        };
+
+        /**
+         * Decodes a ToggleScreenRequest message from the specified reader or buffer.
+         * @function decode
+         * @memberof terminal.ToggleScreenRequest
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @param {number} [length] Message length if known beforehand
+         * @returns {terminal.ToggleScreenRequest} ToggleScreenRequest
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        ToggleScreenRequest.decode = function decode(reader, length, error) {
+            if (!(reader instanceof $Reader))
+                reader = $Reader.create(reader);
+            let end = length === undefined ? reader.len : reader.pos + length, message = new $root.terminal.ToggleScreenRequest();
+            while (reader.pos < end) {
+                let tag = reader.uint32();
+                if (tag === error)
+                    break;
+                switch (tag >>> 3) {
+                case 1: {
+                        message.enabled = reader.bool();
+                        break;
+                    }
+                default:
+                    reader.skipType(tag & 7);
+                    break;
+                }
+            }
+            return message;
+        };
+
+        /**
+         * Decodes a ToggleScreenRequest message from the specified reader or buffer, length delimited.
+         * @function decodeDelimited
+         * @memberof terminal.ToggleScreenRequest
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @returns {terminal.ToggleScreenRequest} ToggleScreenRequest
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        ToggleScreenRequest.decodeDelimited = function decodeDelimited(reader) {
+            if (!(reader instanceof $Reader))
+                reader = new $Reader(reader);
+            return this.decode(reader, reader.uint32());
+        };
+
+        /**
+         * Verifies a ToggleScreenRequest message.
+         * @function verify
+         * @memberof terminal.ToggleScreenRequest
+         * @static
+         * @param {Object.<string,*>} message Plain object to verify
+         * @returns {string|null} `null` if valid, otherwise the reason why it is not
+         */
+        ToggleScreenRequest.verify = function verify(message) {
+            if (typeof message !== "object" || message === null)
+                return "object expected";
+            if (message.enabled != null && message.hasOwnProperty("enabled"))
+                if (typeof message.enabled !== "boolean")
+                    return "enabled: boolean expected";
+            return null;
+        };
+
+        /**
+         * Creates a ToggleScreenRequest message from a plain object. Also converts values to their respective internal types.
+         * @function fromObject
+         * @memberof terminal.ToggleScreenRequest
+         * @static
+         * @param {Object.<string,*>} object Plain object
+         * @returns {terminal.ToggleScreenRequest} ToggleScreenRequest
+         */
+        ToggleScreenRequest.fromObject = function fromObject(object) {
+            if (object instanceof $root.terminal.ToggleScreenRequest)
+                return object;
+            let message = new $root.terminal.ToggleScreenRequest();
+            if (object.enabled != null)
+                message.enabled = Boolean(object.enabled);
+            return message;
+        };
+
+        /**
+         * Creates a plain object from a ToggleScreenRequest message. Also converts values to other types if specified.
+         * @function toObject
+         * @memberof terminal.ToggleScreenRequest
+         * @static
+         * @param {terminal.ToggleScreenRequest} message ToggleScreenRequest
+         * @param {$protobuf.IConversionOptions} [options] Conversion options
+         * @returns {Object.<string,*>} Plain object
+         */
+        ToggleScreenRequest.toObject = function toObject(message, options) {
+            if (!options)
+                options = {};
+            let object = {};
+            if (options.defaults)
+                object.enabled = false;
+            if (message.enabled != null && message.hasOwnProperty("enabled"))
+                object.enabled = message.enabled;
+            return object;
+        };
+
+        /**
+         * Converts this ToggleScreenRequest to JSON.
+         * @function toJSON
+         * @memberof terminal.ToggleScreenRequest
+         * @instance
+         * @returns {Object.<string,*>} JSON object
+         */
+        ToggleScreenRequest.prototype.toJSON = function toJSON() {
+            return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+        };
+
+        /**
+         * Gets the default type url for ToggleScreenRequest
+         * @function getTypeUrl
+         * @memberof terminal.ToggleScreenRequest
+         * @static
+         * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+         * @returns {string} The default type url
+         */
+        ToggleScreenRequest.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+            if (typeUrlPrefix === undefined) {
+                typeUrlPrefix = "type.googleapis.com";
+            }
+            return typeUrlPrefix + "/terminal.ToggleScreenRequest";
+        };
+
+        return ToggleScreenRequest;
+    })();
+
+    terminal.ToggleAdminRequest = (function() {
+
+        /**
+         * Properties of a ToggleAdminRequest.
+         * @memberof terminal
+         * @interface IToggleAdminRequest
+         * @property {boolean|null} [enabled] ToggleAdminRequest enabled
+         */
+
+        /**
+         * Constructs a new ToggleAdminRequest.
+         * @memberof terminal
+         * @classdesc Represents a ToggleAdminRequest.
+         * @implements IToggleAdminRequest
+         * @constructor
+         * @param {terminal.IToggleAdminRequest=} [properties] Properties to set
+         */
+        function ToggleAdminRequest(properties) {
+            if (properties)
+                for (let keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                    if (properties[keys[i]] != null)
+                        this[keys[i]] = properties[keys[i]];
+        }
+
+        /**
+         * ToggleAdminRequest enabled.
+         * @member {boolean} enabled
+         * @memberof terminal.ToggleAdminRequest
+         * @instance
+         */
+        ToggleAdminRequest.prototype.enabled = false;
+
+        /**
+         * Creates a new ToggleAdminRequest instance using the specified properties.
+         * @function create
+         * @memberof terminal.ToggleAdminRequest
+         * @static
+         * @param {terminal.IToggleAdminRequest=} [properties] Properties to set
+         * @returns {terminal.ToggleAdminRequest} ToggleAdminRequest instance
+         */
+        ToggleAdminRequest.create = function create(properties) {
+            return new ToggleAdminRequest(properties);
+        };
+
+        /**
+         * Encodes the specified ToggleAdminRequest message. Does not implicitly {@link terminal.ToggleAdminRequest.verify|verify} messages.
+         * @function encode
+         * @memberof terminal.ToggleAdminRequest
+         * @static
+         * @param {terminal.IToggleAdminRequest} message ToggleAdminRequest message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        ToggleAdminRequest.encode = function encode(message, writer) {
+            if (!writer)
+                writer = $Writer.create();
+            if (message.enabled != null && Object.hasOwnProperty.call(message, "enabled"))
+                writer.uint32(/* id 1, wireType 0 =*/8).bool(message.enabled);
+            return writer;
+        };
+
+        /**
+         * Encodes the specified ToggleAdminRequest message, length delimited. Does not implicitly {@link terminal.ToggleAdminRequest.verify|verify} messages.
+         * @function encodeDelimited
+         * @memberof terminal.ToggleAdminRequest
+         * @static
+         * @param {terminal.IToggleAdminRequest} message ToggleAdminRequest message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        ToggleAdminRequest.encodeDelimited = function encodeDelimited(message, writer) {
+            return this.encode(message, writer).ldelim();
+        };
+
+        /**
+         * Decodes a ToggleAdminRequest message from the specified reader or buffer.
+         * @function decode
+         * @memberof terminal.ToggleAdminRequest
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @param {number} [length] Message length if known beforehand
+         * @returns {terminal.ToggleAdminRequest} ToggleAdminRequest
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        ToggleAdminRequest.decode = function decode(reader, length, error) {
+            if (!(reader instanceof $Reader))
+                reader = $Reader.create(reader);
+            let end = length === undefined ? reader.len : reader.pos + length, message = new $root.terminal.ToggleAdminRequest();
+            while (reader.pos < end) {
+                let tag = reader.uint32();
+                if (tag === error)
+                    break;
+                switch (tag >>> 3) {
+                case 1: {
+                        message.enabled = reader.bool();
+                        break;
+                    }
+                default:
+                    reader.skipType(tag & 7);
+                    break;
+                }
+            }
+            return message;
+        };
+
+        /**
+         * Decodes a ToggleAdminRequest message from the specified reader or buffer, length delimited.
+         * @function decodeDelimited
+         * @memberof terminal.ToggleAdminRequest
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @returns {terminal.ToggleAdminRequest} ToggleAdminRequest
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        ToggleAdminRequest.decodeDelimited = function decodeDelimited(reader) {
+            if (!(reader instanceof $Reader))
+                reader = new $Reader(reader);
+            return this.decode(reader, reader.uint32());
+        };
+
+        /**
+         * Verifies a ToggleAdminRequest message.
+         * @function verify
+         * @memberof terminal.ToggleAdminRequest
+         * @static
+         * @param {Object.<string,*>} message Plain object to verify
+         * @returns {string|null} `null` if valid, otherwise the reason why it is not
+         */
+        ToggleAdminRequest.verify = function verify(message) {
+            if (typeof message !== "object" || message === null)
+                return "object expected";
+            if (message.enabled != null && message.hasOwnProperty("enabled"))
+                if (typeof message.enabled !== "boolean")
+                    return "enabled: boolean expected";
+            return null;
+        };
+
+        /**
+         * Creates a ToggleAdminRequest message from a plain object. Also converts values to their respective internal types.
+         * @function fromObject
+         * @memberof terminal.ToggleAdminRequest
+         * @static
+         * @param {Object.<string,*>} object Plain object
+         * @returns {terminal.ToggleAdminRequest} ToggleAdminRequest
+         */
+        ToggleAdminRequest.fromObject = function fromObject(object) {
+            if (object instanceof $root.terminal.ToggleAdminRequest)
+                return object;
+            let message = new $root.terminal.ToggleAdminRequest();
+            if (object.enabled != null)
+                message.enabled = Boolean(object.enabled);
+            return message;
+        };
+
+        /**
+         * Creates a plain object from a ToggleAdminRequest message. Also converts values to other types if specified.
+         * @function toObject
+         * @memberof terminal.ToggleAdminRequest
+         * @static
+         * @param {terminal.ToggleAdminRequest} message ToggleAdminRequest
+         * @param {$protobuf.IConversionOptions} [options] Conversion options
+         * @returns {Object.<string,*>} Plain object
+         */
+        ToggleAdminRequest.toObject = function toObject(message, options) {
+            if (!options)
+                options = {};
+            let object = {};
+            if (options.defaults)
+                object.enabled = false;
+            if (message.enabled != null && message.hasOwnProperty("enabled"))
+                object.enabled = message.enabled;
+            return object;
+        };
+
+        /**
+         * Converts this ToggleAdminRequest to JSON.
+         * @function toJSON
+         * @memberof terminal.ToggleAdminRequest
+         * @instance
+         * @returns {Object.<string,*>} JSON object
+         */
+        ToggleAdminRequest.prototype.toJSON = function toJSON() {
+            return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+        };
+
+        /**
+         * Gets the default type url for ToggleAdminRequest
+         * @function getTypeUrl
+         * @memberof terminal.ToggleAdminRequest
+         * @static
+         * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+         * @returns {string} The default type url
+         */
+        ToggleAdminRequest.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+            if (typeUrlPrefix === undefined) {
+                typeUrlPrefix = "type.googleapis.com";
+            }
+            return typeUrlPrefix + "/terminal.ToggleAdminRequest";
+        };
+
+        return ToggleAdminRequest;
+    })();
+
+    terminal.HostCapabilities = (function() {
+
+        /**
+         * Properties of a HostCapabilities.
+         * @memberof terminal
+         * @interface IHostCapabilities
+         * @property {boolean|null} [supportsScreenShare] HostCapabilities supportsScreenShare
+         * @property {boolean|null} [supportsAdminMode] HostCapabilities supportsAdminMode
+         * @property {boolean|null} [isAdmin] HostCapabilities isAdmin
+         */
+
+        /**
+         * Constructs a new HostCapabilities.
+         * @memberof terminal
+         * @classdesc Represents a HostCapabilities.
+         * @implements IHostCapabilities
+         * @constructor
+         * @param {terminal.IHostCapabilities=} [properties] Properties to set
+         */
+        function HostCapabilities(properties) {
+            if (properties)
+                for (let keys = Object.keys(properties), i = 0; i < keys.length; ++i)
+                    if (properties[keys[i]] != null)
+                        this[keys[i]] = properties[keys[i]];
+        }
+
+        /**
+         * HostCapabilities supportsScreenShare.
+         * @member {boolean} supportsScreenShare
+         * @memberof terminal.HostCapabilities
+         * @instance
+         */
+        HostCapabilities.prototype.supportsScreenShare = false;
+
+        /**
+         * HostCapabilities supportsAdminMode.
+         * @member {boolean} supportsAdminMode
+         * @memberof terminal.HostCapabilities
+         * @instance
+         */
+        HostCapabilities.prototype.supportsAdminMode = false;
+
+        /**
+         * HostCapabilities isAdmin.
+         * @member {boolean} isAdmin
+         * @memberof terminal.HostCapabilities
+         * @instance
+         */
+        HostCapabilities.prototype.isAdmin = false;
+
+        /**
+         * Creates a new HostCapabilities instance using the specified properties.
+         * @function create
+         * @memberof terminal.HostCapabilities
+         * @static
+         * @param {terminal.IHostCapabilities=} [properties] Properties to set
+         * @returns {terminal.HostCapabilities} HostCapabilities instance
+         */
+        HostCapabilities.create = function create(properties) {
+            return new HostCapabilities(properties);
+        };
+
+        /**
+         * Encodes the specified HostCapabilities message. Does not implicitly {@link terminal.HostCapabilities.verify|verify} messages.
+         * @function encode
+         * @memberof terminal.HostCapabilities
+         * @static
+         * @param {terminal.IHostCapabilities} message HostCapabilities message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        HostCapabilities.encode = function encode(message, writer) {
+            if (!writer)
+                writer = $Writer.create();
+            if (message.supportsScreenShare != null && Object.hasOwnProperty.call(message, "supportsScreenShare"))
+                writer.uint32(/* id 1, wireType 0 =*/8).bool(message.supportsScreenShare);
+            if (message.supportsAdminMode != null && Object.hasOwnProperty.call(message, "supportsAdminMode"))
+                writer.uint32(/* id 2, wireType 0 =*/16).bool(message.supportsAdminMode);
+            if (message.isAdmin != null && Object.hasOwnProperty.call(message, "isAdmin"))
+                writer.uint32(/* id 3, wireType 0 =*/24).bool(message.isAdmin);
+            return writer;
+        };
+
+        /**
+         * Encodes the specified HostCapabilities message, length delimited. Does not implicitly {@link terminal.HostCapabilities.verify|verify} messages.
+         * @function encodeDelimited
+         * @memberof terminal.HostCapabilities
+         * @static
+         * @param {terminal.IHostCapabilities} message HostCapabilities message or plain object to encode
+         * @param {$protobuf.Writer} [writer] Writer to encode to
+         * @returns {$protobuf.Writer} Writer
+         */
+        HostCapabilities.encodeDelimited = function encodeDelimited(message, writer) {
+            return this.encode(message, writer).ldelim();
+        };
+
+        /**
+         * Decodes a HostCapabilities message from the specified reader or buffer.
+         * @function decode
+         * @memberof terminal.HostCapabilities
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @param {number} [length] Message length if known beforehand
+         * @returns {terminal.HostCapabilities} HostCapabilities
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        HostCapabilities.decode = function decode(reader, length, error) {
+            if (!(reader instanceof $Reader))
+                reader = $Reader.create(reader);
+            let end = length === undefined ? reader.len : reader.pos + length, message = new $root.terminal.HostCapabilities();
+            while (reader.pos < end) {
+                let tag = reader.uint32();
+                if (tag === error)
+                    break;
+                switch (tag >>> 3) {
+                case 1: {
+                        message.supportsScreenShare = reader.bool();
+                        break;
+                    }
+                case 2: {
+                        message.supportsAdminMode = reader.bool();
+                        break;
+                    }
+                case 3: {
+                        message.isAdmin = reader.bool();
+                        break;
+                    }
+                default:
+                    reader.skipType(tag & 7);
+                    break;
+                }
+            }
+            return message;
+        };
+
+        /**
+         * Decodes a HostCapabilities message from the specified reader or buffer, length delimited.
+         * @function decodeDelimited
+         * @memberof terminal.HostCapabilities
+         * @static
+         * @param {$protobuf.Reader|Uint8Array} reader Reader or buffer to decode from
+         * @returns {terminal.HostCapabilities} HostCapabilities
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        HostCapabilities.decodeDelimited = function decodeDelimited(reader) {
+            if (!(reader instanceof $Reader))
+                reader = new $Reader(reader);
+            return this.decode(reader, reader.uint32());
+        };
+
+        /**
+         * Verifies a HostCapabilities message.
+         * @function verify
+         * @memberof terminal.HostCapabilities
+         * @static
+         * @param {Object.<string,*>} message Plain object to verify
+         * @returns {string|null} `null` if valid, otherwise the reason why it is not
+         */
+        HostCapabilities.verify = function verify(message) {
+            if (typeof message !== "object" || message === null)
+                return "object expected";
+            if (message.supportsScreenShare != null && message.hasOwnProperty("supportsScreenShare"))
+                if (typeof message.supportsScreenShare !== "boolean")
+                    return "supportsScreenShare: boolean expected";
+            if (message.supportsAdminMode != null && message.hasOwnProperty("supportsAdminMode"))
+                if (typeof message.supportsAdminMode !== "boolean")
+                    return "supportsAdminMode: boolean expected";
+            if (message.isAdmin != null && message.hasOwnProperty("isAdmin"))
+                if (typeof message.isAdmin !== "boolean")
+                    return "isAdmin: boolean expected";
+            return null;
+        };
+
+        /**
+         * Creates a HostCapabilities message from a plain object. Also converts values to their respective internal types.
+         * @function fromObject
+         * @memberof terminal.HostCapabilities
+         * @static
+         * @param {Object.<string,*>} object Plain object
+         * @returns {terminal.HostCapabilities} HostCapabilities
+         */
+        HostCapabilities.fromObject = function fromObject(object) {
+            if (object instanceof $root.terminal.HostCapabilities)
+                return object;
+            let message = new $root.terminal.HostCapabilities();
+            if (object.supportsScreenShare != null)
+                message.supportsScreenShare = Boolean(object.supportsScreenShare);
+            if (object.supportsAdminMode != null)
+                message.supportsAdminMode = Boolean(object.supportsAdminMode);
+            if (object.isAdmin != null)
+                message.isAdmin = Boolean(object.isAdmin);
+            return message;
+        };
+
+        /**
+         * Creates a plain object from a HostCapabilities message. Also converts values to other types if specified.
+         * @function toObject
+         * @memberof terminal.HostCapabilities
+         * @static
+         * @param {terminal.HostCapabilities} message HostCapabilities
+         * @param {$protobuf.IConversionOptions} [options] Conversion options
+         * @returns {Object.<string,*>} Plain object
+         */
+        HostCapabilities.toObject = function toObject(message, options) {
+            if (!options)
+                options = {};
+            let object = {};
+            if (options.defaults) {
+                object.supportsScreenShare = false;
+                object.supportsAdminMode = false;
+                object.isAdmin = false;
+            }
+            if (message.supportsScreenShare != null && message.hasOwnProperty("supportsScreenShare"))
+                object.supportsScreenShare = message.supportsScreenShare;
+            if (message.supportsAdminMode != null && message.hasOwnProperty("supportsAdminMode"))
+                object.supportsAdminMode = message.supportsAdminMode;
+            if (message.isAdmin != null && message.hasOwnProperty("isAdmin"))
+                object.isAdmin = message.isAdmin;
+            return object;
+        };
+
+        /**
+         * Converts this HostCapabilities to JSON.
+         * @function toJSON
+         * @memberof terminal.HostCapabilities
+         * @instance
+         * @returns {Object.<string,*>} JSON object
+         */
+        HostCapabilities.prototype.toJSON = function toJSON() {
+            return this.constructor.toObject(this, $protobuf.util.toJSONOptions);
+        };
+
+        /**
+         * Gets the default type url for HostCapabilities
+         * @function getTypeUrl
+         * @memberof terminal.HostCapabilities
+         * @static
+         * @param {string} [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+         * @returns {string} The default type url
+         */
+        HostCapabilities.getTypeUrl = function getTypeUrl(typeUrlPrefix) {
+            if (typeUrlPrefix === undefined) {
+                typeUrlPrefix = "type.googleapis.com";
+            }
+            return typeUrlPrefix + "/terminal.HostCapabilities";
+        };
+
+        return HostCapabilities;
     })();
 
     return terminal;

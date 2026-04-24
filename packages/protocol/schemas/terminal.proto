@@ -9,8 +9,10 @@ message ClientMessage {
     RegisterHostRequest register_host = 2;
     PtyInput pty_input = 3;
     PtyResize pty_resize = 4;
+    ToggleScreenRequest toggle_screen = 5;
+    ToggleAdminRequest toggle_admin = 6;
   }
-  string client_id = 10; // Injected by relay when forwarding to host
+  string client_id = 10; 
 }
 
 // Server -> Client/Host messages
@@ -22,6 +24,7 @@ message ServerMessage {
     PtyExit pty_exit = 4;
     SystemMessage system_message = 5;
     ErrorMessage error_message = 6;
+    ScreenFrame screen_frame = 7;
   }
 }
 
@@ -32,6 +35,8 @@ message HostMessage {
     RegisterHostRequest register_host = 2;
     PtyOutput pty_output = 3;
     PtyExit pty_exit = 4;
+    ScreenFrame screen_frame = 5;
+    HostCapabilities capabilities = 6;
   }
 }
 
@@ -48,12 +53,14 @@ message AuthResponse {
 message RegisterHostRequest {
   string host_id = 1;
   string password = 2;
+  bool run_as_admin = 3;
 }
 
 message RegisterHostResponse {
   bool ok = 1;
   string token = 2;
   string error = 3;
+  bool is_admin = 4;
 }
 
 message PtyInput {
@@ -81,4 +88,24 @@ message SystemMessage {
 
 message ErrorMessage {
   string message = 1;
+}
+
+message ScreenFrame {
+  bytes data = 1; // JPEG or PNG data
+  uint32 width = 2;
+  uint32 height = 3;
+}
+
+message ToggleScreenRequest {
+  bool enabled = 1;
+}
+
+message ToggleAdminRequest {
+  bool enabled = 1;
+}
+
+message HostCapabilities {
+  bool supports_screen_share = 1;
+  bool supports_admin_mode = 2;
+  bool is_admin = 3;
 }

@@ -18,6 +18,12 @@ export namespace terminal {
         /** ClientMessage ptyResize */
         ptyResize?: (terminal.IPtyResize|null);
 
+        /** ClientMessage toggleScreen */
+        toggleScreen?: (terminal.IToggleScreenRequest|null);
+
+        /** ClientMessage toggleAdmin */
+        toggleAdmin?: (terminal.IToggleAdminRequest|null);
+
         /** ClientMessage clientId */
         clientId?: (string|null);
     }
@@ -43,11 +49,17 @@ export namespace terminal {
         /** ClientMessage ptyResize. */
         public ptyResize?: (terminal.IPtyResize|null);
 
+        /** ClientMessage toggleScreen. */
+        public toggleScreen?: (terminal.IToggleScreenRequest|null);
+
+        /** ClientMessage toggleAdmin. */
+        public toggleAdmin?: (terminal.IToggleAdminRequest|null);
+
         /** ClientMessage clientId. */
         public clientId: string;
 
         /** ClientMessage payload. */
-        public payload?: ("authRequest"|"registerHost"|"ptyInput"|"ptyResize");
+        public payload?: ("authRequest"|"registerHost"|"ptyInput"|"ptyResize"|"toggleScreen"|"toggleAdmin");
 
         /**
          * Creates a new ClientMessage instance using the specified properties.
@@ -147,6 +159,9 @@ export namespace terminal {
 
         /** ServerMessage errorMessage */
         errorMessage?: (terminal.IErrorMessage|null);
+
+        /** ServerMessage screenFrame */
+        screenFrame?: (terminal.IScreenFrame|null);
     }
 
     /** Represents a ServerMessage. */
@@ -176,8 +191,11 @@ export namespace terminal {
         /** ServerMessage errorMessage. */
         public errorMessage?: (terminal.IErrorMessage|null);
 
+        /** ServerMessage screenFrame. */
+        public screenFrame?: (terminal.IScreenFrame|null);
+
         /** ServerMessage payload. */
-        public payload?: ("authResponse"|"registerHostResponse"|"ptyOutput"|"ptyExit"|"systemMessage"|"errorMessage");
+        public payload?: ("authResponse"|"registerHostResponse"|"ptyOutput"|"ptyExit"|"systemMessage"|"errorMessage"|"screenFrame");
 
         /**
          * Creates a new ServerMessage instance using the specified properties.
@@ -271,6 +289,12 @@ export namespace terminal {
 
         /** HostMessage ptyExit */
         ptyExit?: (terminal.IPtyExit|null);
+
+        /** HostMessage screenFrame */
+        screenFrame?: (terminal.IScreenFrame|null);
+
+        /** HostMessage capabilities */
+        capabilities?: (terminal.IHostCapabilities|null);
     }
 
     /** Represents a HostMessage. */
@@ -294,8 +318,14 @@ export namespace terminal {
         /** HostMessage ptyExit. */
         public ptyExit?: (terminal.IPtyExit|null);
 
+        /** HostMessage screenFrame. */
+        public screenFrame?: (terminal.IScreenFrame|null);
+
+        /** HostMessage capabilities. */
+        public capabilities?: (terminal.IHostCapabilities|null);
+
         /** HostMessage payload. */
-        public payload?: ("authRequest"|"registerHost"|"ptyOutput"|"ptyExit");
+        public payload?: ("authRequest"|"registerHost"|"ptyOutput"|"ptyExit"|"screenFrame"|"capabilities");
 
         /**
          * Creates a new HostMessage instance using the specified properties.
@@ -589,6 +619,9 @@ export namespace terminal {
 
         /** RegisterHostRequest password */
         password?: (string|null);
+
+        /** RegisterHostRequest runAsAdmin */
+        runAsAdmin?: (boolean|null);
     }
 
     /** Represents a RegisterHostRequest. */
@@ -605,6 +638,9 @@ export namespace terminal {
 
         /** RegisterHostRequest password. */
         public password: string;
+
+        /** RegisterHostRequest runAsAdmin. */
+        public runAsAdmin: boolean;
 
         /**
          * Creates a new RegisterHostRequest instance using the specified properties.
@@ -695,6 +731,9 @@ export namespace terminal {
 
         /** RegisterHostResponse error */
         error?: (string|null);
+
+        /** RegisterHostResponse isAdmin */
+        isAdmin?: (boolean|null);
     }
 
     /** Represents a RegisterHostResponse. */
@@ -714,6 +753,9 @@ export namespace terminal {
 
         /** RegisterHostResponse error. */
         public error: string;
+
+        /** RegisterHostResponse isAdmin. */
+        public isAdmin: boolean;
 
         /**
          * Creates a new RegisterHostResponse instance using the specified properties.
@@ -1387,6 +1429,418 @@ export namespace terminal {
 
         /**
          * Gets the default type url for ErrorMessage
+         * @param [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+         * @returns The default type url
+         */
+        public static getTypeUrl(typeUrlPrefix?: string): string;
+    }
+
+    /** Properties of a ScreenFrame. */
+    interface IScreenFrame {
+
+        /** ScreenFrame data */
+        data?: (Uint8Array|null);
+
+        /** ScreenFrame width */
+        width?: (number|null);
+
+        /** ScreenFrame height */
+        height?: (number|null);
+    }
+
+    /** Represents a ScreenFrame. */
+    class ScreenFrame implements IScreenFrame {
+
+        /**
+         * Constructs a new ScreenFrame.
+         * @param [properties] Properties to set
+         */
+        constructor(properties?: terminal.IScreenFrame);
+
+        /** ScreenFrame data. */
+        public data: Uint8Array;
+
+        /** ScreenFrame width. */
+        public width: number;
+
+        /** ScreenFrame height. */
+        public height: number;
+
+        /**
+         * Creates a new ScreenFrame instance using the specified properties.
+         * @param [properties] Properties to set
+         * @returns ScreenFrame instance
+         */
+        public static create(properties?: terminal.IScreenFrame): terminal.ScreenFrame;
+
+        /**
+         * Encodes the specified ScreenFrame message. Does not implicitly {@link terminal.ScreenFrame.verify|verify} messages.
+         * @param message ScreenFrame message or plain object to encode
+         * @param [writer] Writer to encode to
+         * @returns Writer
+         */
+        public static encode(message: terminal.IScreenFrame, writer?: $protobuf.Writer): $protobuf.Writer;
+
+        /**
+         * Encodes the specified ScreenFrame message, length delimited. Does not implicitly {@link terminal.ScreenFrame.verify|verify} messages.
+         * @param message ScreenFrame message or plain object to encode
+         * @param [writer] Writer to encode to
+         * @returns Writer
+         */
+        public static encodeDelimited(message: terminal.IScreenFrame, writer?: $protobuf.Writer): $protobuf.Writer;
+
+        /**
+         * Decodes a ScreenFrame message from the specified reader or buffer.
+         * @param reader Reader or buffer to decode from
+         * @param [length] Message length if known beforehand
+         * @returns ScreenFrame
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        public static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): terminal.ScreenFrame;
+
+        /**
+         * Decodes a ScreenFrame message from the specified reader or buffer, length delimited.
+         * @param reader Reader or buffer to decode from
+         * @returns ScreenFrame
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        public static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): terminal.ScreenFrame;
+
+        /**
+         * Verifies a ScreenFrame message.
+         * @param message Plain object to verify
+         * @returns `null` if valid, otherwise the reason why it is not
+         */
+        public static verify(message: { [k: string]: any }): (string|null);
+
+        /**
+         * Creates a ScreenFrame message from a plain object. Also converts values to their respective internal types.
+         * @param object Plain object
+         * @returns ScreenFrame
+         */
+        public static fromObject(object: { [k: string]: any }): terminal.ScreenFrame;
+
+        /**
+         * Creates a plain object from a ScreenFrame message. Also converts values to other types if specified.
+         * @param message ScreenFrame
+         * @param [options] Conversion options
+         * @returns Plain object
+         */
+        public static toObject(message: terminal.ScreenFrame, options?: $protobuf.IConversionOptions): { [k: string]: any };
+
+        /**
+         * Converts this ScreenFrame to JSON.
+         * @returns JSON object
+         */
+        public toJSON(): { [k: string]: any };
+
+        /**
+         * Gets the default type url for ScreenFrame
+         * @param [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+         * @returns The default type url
+         */
+        public static getTypeUrl(typeUrlPrefix?: string): string;
+    }
+
+    /** Properties of a ToggleScreenRequest. */
+    interface IToggleScreenRequest {
+
+        /** ToggleScreenRequest enabled */
+        enabled?: (boolean|null);
+    }
+
+    /** Represents a ToggleScreenRequest. */
+    class ToggleScreenRequest implements IToggleScreenRequest {
+
+        /**
+         * Constructs a new ToggleScreenRequest.
+         * @param [properties] Properties to set
+         */
+        constructor(properties?: terminal.IToggleScreenRequest);
+
+        /** ToggleScreenRequest enabled. */
+        public enabled: boolean;
+
+        /**
+         * Creates a new ToggleScreenRequest instance using the specified properties.
+         * @param [properties] Properties to set
+         * @returns ToggleScreenRequest instance
+         */
+        public static create(properties?: terminal.IToggleScreenRequest): terminal.ToggleScreenRequest;
+
+        /**
+         * Encodes the specified ToggleScreenRequest message. Does not implicitly {@link terminal.ToggleScreenRequest.verify|verify} messages.
+         * @param message ToggleScreenRequest message or plain object to encode
+         * @param [writer] Writer to encode to
+         * @returns Writer
+         */
+        public static encode(message: terminal.IToggleScreenRequest, writer?: $protobuf.Writer): $protobuf.Writer;
+
+        /**
+         * Encodes the specified ToggleScreenRequest message, length delimited. Does not implicitly {@link terminal.ToggleScreenRequest.verify|verify} messages.
+         * @param message ToggleScreenRequest message or plain object to encode
+         * @param [writer] Writer to encode to
+         * @returns Writer
+         */
+        public static encodeDelimited(message: terminal.IToggleScreenRequest, writer?: $protobuf.Writer): $protobuf.Writer;
+
+        /**
+         * Decodes a ToggleScreenRequest message from the specified reader or buffer.
+         * @param reader Reader or buffer to decode from
+         * @param [length] Message length if known beforehand
+         * @returns ToggleScreenRequest
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        public static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): terminal.ToggleScreenRequest;
+
+        /**
+         * Decodes a ToggleScreenRequest message from the specified reader or buffer, length delimited.
+         * @param reader Reader or buffer to decode from
+         * @returns ToggleScreenRequest
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        public static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): terminal.ToggleScreenRequest;
+
+        /**
+         * Verifies a ToggleScreenRequest message.
+         * @param message Plain object to verify
+         * @returns `null` if valid, otherwise the reason why it is not
+         */
+        public static verify(message: { [k: string]: any }): (string|null);
+
+        /**
+         * Creates a ToggleScreenRequest message from a plain object. Also converts values to their respective internal types.
+         * @param object Plain object
+         * @returns ToggleScreenRequest
+         */
+        public static fromObject(object: { [k: string]: any }): terminal.ToggleScreenRequest;
+
+        /**
+         * Creates a plain object from a ToggleScreenRequest message. Also converts values to other types if specified.
+         * @param message ToggleScreenRequest
+         * @param [options] Conversion options
+         * @returns Plain object
+         */
+        public static toObject(message: terminal.ToggleScreenRequest, options?: $protobuf.IConversionOptions): { [k: string]: any };
+
+        /**
+         * Converts this ToggleScreenRequest to JSON.
+         * @returns JSON object
+         */
+        public toJSON(): { [k: string]: any };
+
+        /**
+         * Gets the default type url for ToggleScreenRequest
+         * @param [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+         * @returns The default type url
+         */
+        public static getTypeUrl(typeUrlPrefix?: string): string;
+    }
+
+    /** Properties of a ToggleAdminRequest. */
+    interface IToggleAdminRequest {
+
+        /** ToggleAdminRequest enabled */
+        enabled?: (boolean|null);
+    }
+
+    /** Represents a ToggleAdminRequest. */
+    class ToggleAdminRequest implements IToggleAdminRequest {
+
+        /**
+         * Constructs a new ToggleAdminRequest.
+         * @param [properties] Properties to set
+         */
+        constructor(properties?: terminal.IToggleAdminRequest);
+
+        /** ToggleAdminRequest enabled. */
+        public enabled: boolean;
+
+        /**
+         * Creates a new ToggleAdminRequest instance using the specified properties.
+         * @param [properties] Properties to set
+         * @returns ToggleAdminRequest instance
+         */
+        public static create(properties?: terminal.IToggleAdminRequest): terminal.ToggleAdminRequest;
+
+        /**
+         * Encodes the specified ToggleAdminRequest message. Does not implicitly {@link terminal.ToggleAdminRequest.verify|verify} messages.
+         * @param message ToggleAdminRequest message or plain object to encode
+         * @param [writer] Writer to encode to
+         * @returns Writer
+         */
+        public static encode(message: terminal.IToggleAdminRequest, writer?: $protobuf.Writer): $protobuf.Writer;
+
+        /**
+         * Encodes the specified ToggleAdminRequest message, length delimited. Does not implicitly {@link terminal.ToggleAdminRequest.verify|verify} messages.
+         * @param message ToggleAdminRequest message or plain object to encode
+         * @param [writer] Writer to encode to
+         * @returns Writer
+         */
+        public static encodeDelimited(message: terminal.IToggleAdminRequest, writer?: $protobuf.Writer): $protobuf.Writer;
+
+        /**
+         * Decodes a ToggleAdminRequest message from the specified reader or buffer.
+         * @param reader Reader or buffer to decode from
+         * @param [length] Message length if known beforehand
+         * @returns ToggleAdminRequest
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        public static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): terminal.ToggleAdminRequest;
+
+        /**
+         * Decodes a ToggleAdminRequest message from the specified reader or buffer, length delimited.
+         * @param reader Reader or buffer to decode from
+         * @returns ToggleAdminRequest
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        public static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): terminal.ToggleAdminRequest;
+
+        /**
+         * Verifies a ToggleAdminRequest message.
+         * @param message Plain object to verify
+         * @returns `null` if valid, otherwise the reason why it is not
+         */
+        public static verify(message: { [k: string]: any }): (string|null);
+
+        /**
+         * Creates a ToggleAdminRequest message from a plain object. Also converts values to their respective internal types.
+         * @param object Plain object
+         * @returns ToggleAdminRequest
+         */
+        public static fromObject(object: { [k: string]: any }): terminal.ToggleAdminRequest;
+
+        /**
+         * Creates a plain object from a ToggleAdminRequest message. Also converts values to other types if specified.
+         * @param message ToggleAdminRequest
+         * @param [options] Conversion options
+         * @returns Plain object
+         */
+        public static toObject(message: terminal.ToggleAdminRequest, options?: $protobuf.IConversionOptions): { [k: string]: any };
+
+        /**
+         * Converts this ToggleAdminRequest to JSON.
+         * @returns JSON object
+         */
+        public toJSON(): { [k: string]: any };
+
+        /**
+         * Gets the default type url for ToggleAdminRequest
+         * @param [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
+         * @returns The default type url
+         */
+        public static getTypeUrl(typeUrlPrefix?: string): string;
+    }
+
+    /** Properties of a HostCapabilities. */
+    interface IHostCapabilities {
+
+        /** HostCapabilities supportsScreenShare */
+        supportsScreenShare?: (boolean|null);
+
+        /** HostCapabilities supportsAdminMode */
+        supportsAdminMode?: (boolean|null);
+
+        /** HostCapabilities isAdmin */
+        isAdmin?: (boolean|null);
+    }
+
+    /** Represents a HostCapabilities. */
+    class HostCapabilities implements IHostCapabilities {
+
+        /**
+         * Constructs a new HostCapabilities.
+         * @param [properties] Properties to set
+         */
+        constructor(properties?: terminal.IHostCapabilities);
+
+        /** HostCapabilities supportsScreenShare. */
+        public supportsScreenShare: boolean;
+
+        /** HostCapabilities supportsAdminMode. */
+        public supportsAdminMode: boolean;
+
+        /** HostCapabilities isAdmin. */
+        public isAdmin: boolean;
+
+        /**
+         * Creates a new HostCapabilities instance using the specified properties.
+         * @param [properties] Properties to set
+         * @returns HostCapabilities instance
+         */
+        public static create(properties?: terminal.IHostCapabilities): terminal.HostCapabilities;
+
+        /**
+         * Encodes the specified HostCapabilities message. Does not implicitly {@link terminal.HostCapabilities.verify|verify} messages.
+         * @param message HostCapabilities message or plain object to encode
+         * @param [writer] Writer to encode to
+         * @returns Writer
+         */
+        public static encode(message: terminal.IHostCapabilities, writer?: $protobuf.Writer): $protobuf.Writer;
+
+        /**
+         * Encodes the specified HostCapabilities message, length delimited. Does not implicitly {@link terminal.HostCapabilities.verify|verify} messages.
+         * @param message HostCapabilities message or plain object to encode
+         * @param [writer] Writer to encode to
+         * @returns Writer
+         */
+        public static encodeDelimited(message: terminal.IHostCapabilities, writer?: $protobuf.Writer): $protobuf.Writer;
+
+        /**
+         * Decodes a HostCapabilities message from the specified reader or buffer.
+         * @param reader Reader or buffer to decode from
+         * @param [length] Message length if known beforehand
+         * @returns HostCapabilities
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        public static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): terminal.HostCapabilities;
+
+        /**
+         * Decodes a HostCapabilities message from the specified reader or buffer, length delimited.
+         * @param reader Reader or buffer to decode from
+         * @returns HostCapabilities
+         * @throws {Error} If the payload is not a reader or valid buffer
+         * @throws {$protobuf.util.ProtocolError} If required fields are missing
+         */
+        public static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): terminal.HostCapabilities;
+
+        /**
+         * Verifies a HostCapabilities message.
+         * @param message Plain object to verify
+         * @returns `null` if valid, otherwise the reason why it is not
+         */
+        public static verify(message: { [k: string]: any }): (string|null);
+
+        /**
+         * Creates a HostCapabilities message from a plain object. Also converts values to their respective internal types.
+         * @param object Plain object
+         * @returns HostCapabilities
+         */
+        public static fromObject(object: { [k: string]: any }): terminal.HostCapabilities;
+
+        /**
+         * Creates a plain object from a HostCapabilities message. Also converts values to other types if specified.
+         * @param message HostCapabilities
+         * @param [options] Conversion options
+         * @returns Plain object
+         */
+        public static toObject(message: terminal.HostCapabilities, options?: $protobuf.IConversionOptions): { [k: string]: any };
+
+        /**
+         * Converts this HostCapabilities to JSON.
+         * @returns JSON object
+         */
+        public toJSON(): { [k: string]: any };
+
+        /**
+         * Gets the default type url for HostCapabilities
          * @param [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
          * @returns The default type url
          */
