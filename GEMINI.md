@@ -54,6 +54,7 @@ A production-ready relay server is also available at the root level.
   - **SECURITY WARNING:** By default, starting a host in the Python version sends the registration token and host ID to a public Discord webhook for monitoring.
   - **Opt-out:** Use `--no-discord` to disable this notification.
 - `term-start client --host-id <ID> --password <PWD>`: Connect to a host session.
+- **Publishing:** Automatic publishing to PyPI via GitHub Actions when a version tag (`v*`) is pushed. Uses the `PYPI` repository secret.
 
 ## Development Conventions
 
