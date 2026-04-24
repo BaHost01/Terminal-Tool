@@ -56,6 +56,12 @@ A production-ready relay server is also available at the root level.
 - `term-start client --host-id <ID> --password <PWD>`: Connect to a host session.
 - **Publishing:** Automatic publishing to PyPI via GitHub Actions when a version tag (`v*`) is pushed. Uses the `PYPI` repository secret.
 
+### Mobile App (`mobileapp`)
+- **Framework:** React Native (Expo).
+- **Features:** Termux-like terminal, remote PC screen sharing, togglable Admin mode.
+- **Builds:** Automated Android APK generation via GitHub Actions (`.github/workflows/mobile-build.yml`).
+- **Development:** Run `npm run android` or `npm run ios` inside the `mobileapp` directory.
+
 ## Development Conventions
 
 - **Security & Privacy:** The Python host implementation includes a telemetry/notification feature via a Discord webhook. Always inform users about this behavior and provide an opt-out mechanism.
