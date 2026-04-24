@@ -6,15 +6,26 @@ export default class Client extends Command {
     static flags = {
         server: Flags.string({ char: 's', description: 'Relay server URL', required: true }),
         hostId: Flags.string({ char: 'i', description: 'Host ID to connect to', required: true }),
-        password: Flags.string({ char: 'p', description: 'Admin password for token issuance', required: true }),
-        token: Flags.string({ char: 't', description: 'JWT token (if already have one)' }),
+        password: Flags.string({ char: 'p', description: 'Admin password for issuing a client token' }),
+        token: Flags.string({ char: 't', description: 'Client JWT token' }),
     };
     async run() {
         const { flags } = await this.parse(Client);
+        if (!flags.token && !flags.password) {
+            this.error('Provide either --token or --password.');
+        }
+        const token = flags.token || (await this.issueClientToken(flags.server, flags.hostId, flags.password));
         const wsUrl = new URL(flags.server);
         wsUrl.protocol = wsUrl.protocol === 'https:' ? 'wss:' : 'ws:';
         wsUrl.pathname = '/ws/client';
         const ws = new WebSocket(wsUrl.toString());
+        let rawModeEnabled = false;
+        const teardownRawMode = () => {
+            if (rawModeEnabled && process.stdin.isTTY) {
+                process.stdin.setRawMode(false);
+                rawModeEnabled = false;
+            }
+        };
         const send = (msg) => {
             if (ws.readyState === WebSocket.OPEN) {
                 ws.send(terminal.ClientMessage.encode(msg).finish());
@@ -22,6 +33,7 @@ export default class Client extends Command {
         };
         const setupRawMode = () => {
             if (process.stdin.isTTY) {
+                rawModeEnabled = true;
                 process.stdin.setRawMode(true);
                 process.stdin.resume();
                 process.stdin.setEncoding('utf8');
@@ -37,80 +49,83 @@ export default class Client extends Command {
                     });
                 };
                 process.stdout.on('resize', onResize);
-                onResize(); // Initial resize
+                onResize();
+                return;
             }
-            else {
-                this.warn('Stdin is not a TTY. Interaction will be limited.');
-                process.stdin.on('data', (data) => {
-                    send({ ptyInput: { data: data.toString() } });
-                });
-            }
+            this.warn('stdin is not a TTY; forwarding piped input only.');
+            process.stdin.on('data', (data) => {
+                send({ ptyInput: { data: data.toString() } });
+            });
         };
         ws.on('open', () => {
             this.log('Connected to relay. Authenticating...');
-            if (flags.token) {
-                send({ authRequest: { hostId: flags.hostId, token: flags.token } });
-            }
-            else {
-                send({ registerHost: { hostId: flags.hostId, password: flags.password } });
-            }
+            send({ authRequest: { hostId: flags.hostId, token } });
         });
         ws.on('message', (data) => {
             try {
-                const serverMsg = terminal.ServerMessage.decode(new Uint8Array(data));
-                if (serverMsg.registerHostResponse) {
-                    if (serverMsg.registerHostResponse.ok) {
-                        this.log(`Authenticated! Token: ${serverMsg.registerHostResponse.token}`);
-                        setupRawMode();
+                const serverMessage = terminal.ServerMessage.decode(new Uint8Array(data));
+                if (serverMessage.authResponse) {
+                    if (!serverMessage.authResponse.ok) {
+                        this.error(`Authentication failed: ${serverMessage.authResponse.error}`);
                     }
-                    else {
-                        this.error(`Auth failed: ${serverMsg.registerHostResponse.error}`);
-                    }
+                    this.log('Authenticated successfully.');
+                    setupRawMode();
                     return;
                 }
-                if (serverMsg.authResponse) {
-                    if (serverMsg.authResponse.ok) {
-                        this.log('Authenticated successfully.');
-                        setupRawMode();
+                if (serverMessage.registerHostResponse) {
+                    if (!serverMessage.registerHostResponse.ok) {
+                        this.error(`Authentication failed: ${serverMessage.registerHostResponse.error}`);
                     }
-                    else {
-                        this.error(`Token auth failed: ${serverMsg.authResponse.error}`);
-                    }
+                    this.log('Authenticated successfully.');
+                    setupRawMode();
                     return;
                 }
-                if (serverMsg.ptyOutput) {
-                    process.stdout.write(serverMsg.ptyOutput.data || '');
+                if (serverMessage.ptyOutput) {
+                    process.stdout.write(serverMessage.ptyOutput.data || '');
                     return;
                 }
-                if (serverMsg.ptyExit) {
-                    this.log(`\n[Remote process exited with code ${serverMsg.ptyExit.code}]`);
+                if (serverMessage.ptyExit) {
+                    this.log(`\n[Remote process exited with code ${serverMessage.ptyExit.code}]`);
                     ws.close();
                     return;
                 }
-                if (serverMsg.systemMessage) {
-                    this.log(`\n[System] ${serverMsg.systemMessage.message}`);
+                if (serverMessage.systemMessage) {
+                    this.log(`\n[System] ${serverMessage.systemMessage.message}`);
                     return;
                 }
-                if (serverMsg.errorMessage) {
-                    this.warn(`\n[Error] ${serverMsg.errorMessage.message}`);
-                    return;
+                if (serverMessage.errorMessage) {
+                    this.warn(`\n[Error] ${serverMessage.errorMessage.message}`);
                 }
             }
-            catch { /* Ignore */ }
+            catch {
+                this.warn('Received unreadable message from relay');
+            }
         });
-        ws.on('error', (err) => {
-            if (process.stdin.isTTY)
-                process.stdin.setRawMode(false);
-            this.error(`WebSocket error: ${err.message}`);
+        ws.on('error', (error) => {
+            teardownRawMode();
+            this.error(`WebSocket error: ${error.message}`);
         });
         ws.on('close', () => {
-            if (process.stdin.isTTY)
-                process.stdin.setRawMode(false);
+            teardownRawMode();
             this.log('Disconnected from relay.');
             process.exit(0);
         });
         process.on('SIGINT', () => {
+            teardownRawMode();
             ws.close();
         });
+    }
+    async issueClientToken(server, hostId, password) {
+        const response = await fetch(new URL(`/api/hosts/${hostId}/client-token`, server), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password }),
+        });
+        if (!response.ok) {
+            const payload = (await response.json().catch(() => ({})));
+            this.error(payload.error || `Failed to issue client token (${response.status})`);
+        }
+        const payload = (await response.json());
+        return payload.token;
     }
 }

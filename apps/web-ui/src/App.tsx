@@ -1,232 +1,614 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Terminal as XTerm } from '@xterm/xterm';
+import { startTransition, useEffect, useRef, useState } from 'react';
 import { FitAddon } from '@xterm/addon-fit';
+import { Terminal as XTerm } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
 import { terminal as protocol } from '@terminal-tool/protocol';
-import { Monitor, Key, Link as LinkIcon, ShieldAlert, Terminal as TerminalIcon } from 'lucide-react';
+import {
+  Activity,
+  KeyRound,
+  MonitorSmartphone,
+  RefreshCcw,
+  Save,
+  ShieldCheck,
+  TerminalSquare,
+  Wifi,
+} from 'lucide-react';
 
-// --- Types ---
-interface AuthData {
-  server: string;
-  hostId: string;
-  password?: string;
-  token?: string;
+type ConnectionState = 'idle' | 'connecting' | 'connected' | 'error' | 'disconnected';
+
+interface HostSettings {
+  displayName: string;
+  notes: string;
+  readOnly: boolean;
+  welcomeMessage: string;
+  preferredShell: string;
+  preferredCwd: string;
 }
 
-// --- Components ---
+interface HostItem {
+  hostId: string;
+  online: boolean;
+  clients: number;
+  createdAt: string;
+  lastSeenAt: string | null;
+  lastClientAt: string | null;
+  settings: HostSettings;
+}
 
-const Login: React.FC<{ onLogin: (data: AuthData) => void }> = ({ onLogin }) => {
-  const [server, setServer] = useState('http://localhost:3000');
-  const [hostId, setHostId] = useState('');
-  const [password, setPassword] = useState('');
+interface HostsResponse {
+  items: HostItem[];
+}
 
+interface HostResponse {
+  item: HostItem;
+}
+
+interface TokenResponse {
+  token: string;
+  host: HostItem;
+}
+
+interface SessionState {
+  server: string;
+  hostId: string;
+  displayName: string;
+  token: string;
+}
+
+function getDefaultServer() {
+  if (typeof window === 'undefined') {
+    return 'http://localhost:3000';
+  }
+
+  return window.location.origin.startsWith('http')
+    ? window.location.origin
+    : 'http://localhost:3000';
+}
+
+function formatStamp(value: string | null) {
+  if (!value) {
+    return 'Never';
+  }
+
+  return new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(value));
+}
+
+function StatusPill({ online, readOnly }: { online: boolean; readOnly: boolean }) {
   return (
-    <div className="flex items-center justify-center min-h-screen p-4">
-      <div className="w-full max-w-md p-8 rounded-xl bg-slate-800 shadow-2xl border border-slate-700">
-        <div className="flex flex-col items-center mb-8">
-          <div className="p-3 bg-blue-600 rounded-lg mb-4">
-            <TerminalIcon size={32} className="text-white" />
-          </div>
-          <h1 className="text-2xl font-bold">Terminal Tool</h1>
-          <p className="text-slate-400 text-sm mt-1">Remote Access Dashboard v2</p>
-        </div>
-
-        <form onSubmit={(e) => { e.preventDefault(); onLogin({ server, hostId, password }); }} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Relay Server</label>
-            <div className="relative">
-              <LinkIcon size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-              <input 
-                type="text" value={server} onChange={(e) => setServer(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 pl-10 pr-4 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                placeholder="http://..."
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Host ID</label>
-            <div className="relative">
-              <Monitor size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-              <input 
-                type="text" value={hostId} onChange={(e) => setHostId(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 pl-10 pr-4 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                placeholder="Unique host identifier"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Admin Password</label>
-            <div className="relative">
-              <Key size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-              <input 
-                type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg py-2 pl-10 pr-4 focus:ring-2 focus:ring-blue-500 outline-none transition-all"
-                placeholder="••••••••"
-              />
-            </div>
-          </div>
-
-          <button 
-            type="submit"
-            className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 rounded-lg mt-4 shadow-lg shadow-blue-600/20 transition-all flex items-center justify-center gap-2"
-          >
-            Connect
-          </button>
-        </form>
-      </div>
+    <div className="status-row">
+      <span className={`status-pill ${online ? 'status-pill-online' : 'status-pill-offline'}`}>
+        {online ? 'Online' : 'Offline'}
+      </span>
+      {readOnly ? <span className="status-pill status-pill-readonly">Read-only</span> : null}
     </div>
   );
-};
+}
 
-const TerminalView: React.FC<{ auth: AuthData; onDisconnect: () => void }> = ({ auth, onDisconnect }) => {
-  const terminalRef = useRef<HTMLDivElement>(null);
-  const xtermRef = useRef<XTerm | null>(null);
-  const wsRef = useRef<WebSocket | null>(null);
-  const [status, setStatus] = useState<'connecting' | 'connected' | 'error' | 'disconnected'>('connecting');
-  const [errorMsg, setErrorMsg] = useState('');
+function TerminalSession({
+  session,
+  onClose,
+}: {
+  session: SessionState;
+  onClose: () => void;
+}) {
+  const terminalContainerRef = useRef<HTMLDivElement | null>(null);
+  const terminalRef = useRef<XTerm | null>(null);
+  const [status, setStatus] = useState<ConnectionState>('connecting');
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    if (!terminalRef.current) return;
+    if (!terminalContainerRef.current) {
+      return;
+    }
 
-    // Initialize XTerm
-    const xterm = new XTerm({
+    const terminal = new XTerm({
       cursorBlink: true,
+      convertEol: true,
+      fontFamily: '"IBM Plex Mono", monospace',
+      fontSize: 14,
       theme: {
-        background: '#0f172a', // slate-900
+        background: '#06131d',
+        foreground: '#d3f6ff',
+        cursor: '#7af0ff',
+        selectionBackground: '#225264',
       },
     });
-    const fitAddon = new FitAddon();
-    xterm.loadAddon(fitAddon);
-    xterm.open(terminalRef.current);
-    fitAddon.fit();
-    xtermRef.current = xterm;
 
-    // Initialize WebSocket
-    const wsUrl = new URL(auth.server);
+    const fitAddon = new FitAddon();
+    terminal.loadAddon(fitAddon);
+    terminal.open(terminalContainerRef.current);
+    fitAddon.fit();
+    terminalRef.current = terminal;
+
+    const wsUrl = new URL(session.server);
     wsUrl.protocol = wsUrl.protocol === 'https:' ? 'wss:' : 'ws:';
     wsUrl.pathname = '/ws/client';
-    
-    const ws = new WebSocket(wsUrl.toString());
-    wsRef.current = ws;
+    const ws = new WebSocket(wsUrl);
 
-    const send = (msg: protocol.IClientMessage) => {
+    const send = (message: protocol.IClientMessage) => {
       if (ws.readyState === WebSocket.OPEN) {
-        ws.send(protocol.ClientMessage.encode(msg).finish());
+        ws.send(protocol.ClientMessage.encode(message).finish());
       }
     };
 
+    const handleResize = () => {
+      fitAddon.fit();
+      send({
+        ptyResize: {
+          cols: terminal.cols,
+          rows: terminal.rows,
+        },
+      });
+    };
+
     ws.onopen = () => {
-      setStatus('connected');
-      xterm.writeln('\x1b[32m[Connected to Relay]\x1b[0m');
-      send({ registerHost: { hostId: auth.hostId, password: auth.password } });
+      setStatus('connecting');
+      terminal.writeln('\x1b[36m[relay connected]\x1b[0m');
+      send({
+        authRequest: {
+          hostId: session.hostId,
+          token: session.token,
+        },
+      });
     };
 
     ws.onmessage = async (event) => {
       const data = new Uint8Array(await event.data.arrayBuffer());
+
       try {
-        const msg = protocol.ServerMessage.decode(data);
-        if (msg.registerHostResponse) {
-          if (msg.registerHostResponse.ok) {
-            xterm.writeln(`\x1b[32m[Authenticated as client]\x1b[0m`);
-          } else {
-            setErrorMsg(msg.registerHostResponse.error || 'Registration failed');
+        const message = protocol.ServerMessage.decode(data);
+        if (message.authResponse) {
+          if (!message.authResponse.ok) {
             setStatus('error');
+            setError(message.authResponse.error || 'Authentication failed');
+            terminal.writeln(`\x1b[31m[auth failed] ${message.authResponse.error}\x1b[0m`);
+            return;
           }
+
+          setStatus('connected');
+          terminal.writeln(`\x1b[32m[connected to ${session.displayName}]\x1b[0m`);
+          handleResize();
+          return;
         }
-        if (msg.ptyOutput) {
-          xterm.write(msg.ptyOutput.data || '');
+
+        if (message.ptyOutput) {
+          terminal.write(message.ptyOutput.data || '');
+          return;
         }
-        if (msg.systemMessage) {
-          xterm.writeln(`\x1b[34m[System] ${msg.systemMessage.message}\x1b[0m`);
+
+        if (message.systemMessage) {
+          terminal.writeln(`\r\n\x1b[34m[system] ${message.systemMessage.message}\x1b[0m`);
+          return;
         }
-        if (msg.errorMessage) {
-          xterm.writeln(`\x1b[31m[Error] ${msg.errorMessage.message}\x1b[0m`);
+
+        if (message.errorMessage) {
+          terminal.writeln(`\r\n\x1b[31m[relay] ${message.errorMessage.message}\x1b[0m`);
+          return;
         }
-        if (msg.ptyExit) {
-          xterm.writeln(`\n\x1b[33m[Remote process exited with code ${msg.ptyExit.code}]\x1b[0m`);
+
+        if (message.ptyExit) {
+          terminal.writeln(`\r\n\x1b[33m[process exited ${message.ptyExit.code}]\x1b[0m`);
         }
-      } catch (e) {
-        console.error('Failed to decode message', e);
+      } catch (decodeError) {
+        console.error('Failed to decode relay message', decodeError);
       }
+    };
+
+    ws.onerror = () => {
+      setStatus('error');
+      setError('WebSocket connection error');
     };
 
     ws.onclose = () => {
       setStatus('disconnected');
-      xterm.writeln('\n\x1b[31m[Disconnected from Relay]\x1b[0m');
+      terminal.writeln('\r\n\x1b[31m[relay disconnected]\x1b[0m');
     };
 
-    ws.onerror = (err) => {
-      console.error('WS Error', err);
-      setStatus('error');
-      setErrorMsg('WebSocket connection error');
-    };
-
-    xterm.onData((data) => {
-      send({ ptyInput: { data } });
+    const dataDisposable = terminal.onData((value) => {
+      send({ ptyInput: { data: value } });
     });
-
-    xterm.onResize(({ cols, rows }) => {
+    const resizeDisposable = terminal.onResize(({ cols, rows }) => {
       send({ ptyResize: { cols, rows } });
     });
-
-    const handleResize = () => fitAddon.fit();
     window.addEventListener('resize', handleResize);
 
     return () => {
       window.removeEventListener('resize', handleResize);
+      dataDisposable.dispose();
+      resizeDisposable.dispose();
       ws.close();
-      xterm.dispose();
+      terminal.dispose();
     };
-  }, [auth]);
+  }, [session]);
 
   return (
-    <div className="flex flex-col h-screen bg-slate-900">
-      <header className="flex items-center justify-between px-6 py-3 bg-slate-800 border-b border-slate-700">
-        <div className="flex items-center gap-3">
-          <TerminalIcon size={20} className="text-blue-500" />
-          <h2 className="font-bold">Session: <span className="text-slate-400 font-mono">{auth.hostId}</span></h2>
-          <div className={`w-2 h-2 rounded-full ${status === 'connected' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-red-500'}`}></div>
+    <section className="terminal-shell">
+      <div className="terminal-toolbar">
+        <div>
+          <p className="eyebrow">Live session</p>
+          <h3>{session.displayName}</h3>
         </div>
-        <button 
-          onClick={onDisconnect}
-          className="bg-slate-700 hover:bg-red-600/20 hover:text-red-500 text-slate-300 px-4 py-1.5 rounded-lg text-sm font-medium transition-all"
-        >
-          Disconnect
-        </button>
-      </header>
-      
-      <main className="flex-1 overflow-hidden p-4 relative">
-        <div ref={terminalRef} className="h-full w-full rounded-lg overflow-hidden border border-slate-700 bg-black shadow-inner" />
-        
-        {status === 'error' && (
-          <div className="absolute inset-0 flex items-center justify-center bg-slate-900/80 backdrop-blur-sm">
-            <div className="bg-slate-800 p-8 rounded-xl border border-red-500/30 shadow-2xl max-w-sm text-center">
-              <ShieldAlert size={48} className="text-red-500 mx-auto mb-4" />
-              <h3 className="text-xl font-bold mb-2">Connection Error</h3>
-              <p className="text-slate-400 mb-6">{errorMsg}</p>
-              <button onClick={onDisconnect} className="bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-lg font-bold">Return to Login</button>
+        <div className="terminal-actions">
+          <span className={`status-pill status-pill-${status}`}>{status}</span>
+          <button className="ghost-button" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
+      <div className="terminal-frame" ref={terminalContainerRef} />
+      {status === 'error' && error ? <p className="terminal-error">{error}</p> : null}
+    </section>
+  );
+}
+
+export default function App() {
+  const [server, setServer] = useState(getDefaultServer());
+  const [password, setPassword] = useState('');
+  const [hosts, setHosts] = useState<HostItem[]>([]);
+  const [selectedHostId, setSelectedHostId] = useState('');
+  const [loadingHosts, setLoadingHosts] = useState(false);
+  const [message, setMessage] = useState('');
+  const [session, setSession] = useState<SessionState | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [tokenLoading, setTokenLoading] = useState(false);
+  const [draft, setDraft] = useState<HostSettings>({
+    displayName: '',
+    notes: '',
+    readOnly: false,
+    welcomeMessage: '',
+    preferredShell: '',
+    preferredCwd: '',
+  });
+
+  const selectedHost = hosts.find((host) => host.hostId === selectedHostId) || null;
+
+  useEffect(() => {
+    void refreshHosts();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedHost) {
+      return;
+    }
+
+    setDraft(selectedHost.settings);
+  }, [selectedHost]);
+
+  async function refreshHosts() {
+    setLoadingHosts(true);
+    setMessage('');
+
+    try {
+      const response = await fetch(new URL('/api/hosts', server));
+      if (!response.ok) {
+        throw new Error(`Failed to load hosts (${response.status})`);
+      }
+
+      const payload = (await response.json()) as HostsResponse;
+      setHosts(payload.items);
+
+      if (!selectedHostId && payload.items[0]) {
+        startTransition(() => {
+          setSelectedHostId(payload.items[0].hostId);
+        });
+      }
+
+      if (selectedHostId && !payload.items.some((item) => item.hostId === selectedHostId)) {
+        startTransition(() => {
+          setSelectedHostId(payload.items[0]?.hostId || '');
+        });
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Failed to load hosts');
+    } finally {
+      setLoadingHosts(false);
+    }
+  }
+
+  async function saveSettings() {
+    if (!selectedHost) {
+      setMessage('Select a host first.');
+      return;
+    }
+
+    if (!password) {
+      setMessage('Admin password is required to save settings.');
+      return;
+    }
+
+    setSaving(true);
+    setMessage('');
+    try {
+      const response = await fetch(new URL(`/api/hosts/${selectedHost.hostId}/settings`, server), {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          password,
+          ...draft,
+        }),
+      });
+
+      const payload = (await response.json()) as HostResponse | { error?: string };
+      if (!response.ok || !('item' in payload)) {
+        throw new Error(('error' in payload && payload.error) || 'Failed to save settings');
+      }
+
+      setHosts((current) =>
+        current.map((host) => (host.hostId === payload.item.hostId ? payload.item : host)),
+      );
+      setMessage(`Saved settings for ${payload.item.settings.displayName}.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Failed to save settings');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function openSession() {
+    if (!selectedHost) {
+      setMessage('Select a host first.');
+      return;
+    }
+
+    if (!password) {
+      setMessage('Admin password is required to issue a client token.');
+      return;
+    }
+
+    setTokenLoading(true);
+    setMessage('');
+    try {
+      const response = await fetch(
+        new URL(`/api/hosts/${selectedHost.hostId}/client-token`, server),
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password }),
+        },
+      );
+      const payload = (await response.json()) as TokenResponse | { error?: string };
+      if (!response.ok || !('token' in payload)) {
+        throw new Error(('error' in payload && payload.error) || 'Failed to issue token');
+      }
+
+      setSession({
+        server,
+        hostId: selectedHost.hostId,
+        displayName: payload.host.settings.displayName,
+        token: payload.token,
+      });
+      setHosts((current) =>
+        current.map((host) => (host.hostId === payload.host.hostId ? payload.host : host)),
+      );
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Failed to open session');
+    } finally {
+      setTokenLoading(false);
+    }
+  }
+
+  return (
+    <main className="app-shell">
+      <section className="hero-panel">
+        <div className="hero-copy">
+          <p className="eyebrow">Terminal Tool / Rebuilt control plane</p>
+          <h1>Manage hosts, ship tokens, and attach to live shells from one dashboard.</h1>
+          <p className="hero-body">
+            The original UI only handled one direct login path. This remake adds host discovery,
+            stored settings, read-only sessions, and a terminal surface that fits the actual relay
+            behavior.
+          </p>
+        </div>
+
+        <div className="stats-grid">
+          <article className="stat-card">
+            <Wifi className="stat-icon" />
+            <strong>{hosts.filter((host) => host.online).length}</strong>
+            <span>Hosts online</span>
+          </article>
+          <article className="stat-card">
+            <Activity className="stat-icon" />
+            <strong>{hosts.reduce((sum, host) => sum + host.clients, 0)}</strong>
+            <span>Client sessions</span>
+          </article>
+          <article className="stat-card">
+            <ShieldCheck className="stat-icon" />
+            <strong>{hosts.filter((host) => host.settings.readOnly).length}</strong>
+            <span>Read-only hosts</span>
+          </article>
+        </div>
+      </section>
+
+      <section className="control-grid">
+        <aside className="panel">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">Relay access</p>
+              <h2>Control surface</h2>
             </div>
           </div>
+
+          <label className="field">
+            <span>Relay server</span>
+            <input value={server} onChange={(event) => setServer(event.target.value)} />
+          </label>
+
+          <label className="field">
+            <span>Admin password</span>
+            <input
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              placeholder="Required for tokens and settings"
+            />
+          </label>
+
+          <div className="action-row">
+            <button className="primary-button" onClick={() => void refreshHosts()} disabled={loadingHosts}>
+              <RefreshCcw size={16} />
+              {loadingHosts ? 'Refreshing...' : 'Refresh hosts'}
+            </button>
+          </div>
+
+          {message ? <p className="inline-message">{message}</p> : null}
+
+          <div className="host-list">
+            {hosts.length === 0 ? <p className="empty-state">No hosts registered yet.</p> : null}
+            {hosts.map((host) => (
+              <button
+                key={host.hostId}
+                className={`host-card ${host.hostId === selectedHostId ? 'host-card-active' : ''}`}
+                onClick={() => setSelectedHostId(host.hostId)}
+              >
+                <div className="host-card-top">
+                  <div>
+                    <strong>{host.settings.displayName}</strong>
+                    <p>{host.hostId}</p>
+                  </div>
+                  <StatusPill online={host.online} readOnly={host.settings.readOnly} />
+                </div>
+                <div className="host-card-meta">
+                  <span>{host.clients} clients</span>
+                  <span>Last seen {formatStamp(host.lastSeenAt)}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </aside>
+
+        <section className="panel">
+          <div className="panel-header">
+            <div>
+              <p className="eyebrow">Host profile</p>
+              <h2>{selectedHost?.settings.displayName || 'Select a host'}</h2>
+            </div>
+            <MonitorSmartphone className="header-icon" />
+          </div>
+
+          {selectedHost ? (
+            <>
+              <div className="details-grid">
+                <div className="detail-card">
+                  <span className="detail-label">Host ID</span>
+                  <strong>{selectedHost.hostId}</strong>
+                </div>
+                <div className="detail-card">
+                  <span className="detail-label">Created</span>
+                  <strong>{formatStamp(selectedHost.createdAt)}</strong>
+                </div>
+                <div className="detail-card">
+                  <span className="detail-label">Last client</span>
+                  <strong>{formatStamp(selectedHost.lastClientAt)}</strong>
+                </div>
+              </div>
+
+              <div className="form-grid">
+                <label className="field">
+                  <span>Display name</span>
+                  <input
+                    value={draft.displayName}
+                    onChange={(event) =>
+                      setDraft((current) => ({ ...current, displayName: event.target.value }))
+                    }
+                  />
+                </label>
+
+                <label className="field">
+                  <span>Preferred shell</span>
+                  <input
+                    value={draft.preferredShell}
+                    onChange={(event) =>
+                      setDraft((current) => ({ ...current, preferredShell: event.target.value }))
+                    }
+                    placeholder="/bin/bash"
+                  />
+                </label>
+
+                <label className="field">
+                  <span>Preferred working directory</span>
+                  <input
+                    value={draft.preferredCwd}
+                    onChange={(event) =>
+                      setDraft((current) => ({ ...current, preferredCwd: event.target.value }))
+                    }
+                    placeholder="/srv/app"
+                  />
+                </label>
+
+                <label className="field">
+                  <span>Welcome message</span>
+                  <input
+                    value={draft.welcomeMessage}
+                    onChange={(event) =>
+                      setDraft((current) => ({ ...current, welcomeMessage: event.target.value }))
+                    }
+                    placeholder="Maintenance host: read output before typing."
+                  />
+                </label>
+
+                <label className="field field-full">
+                  <span>Notes</span>
+                  <textarea
+                    value={draft.notes}
+                    onChange={(event) =>
+                      setDraft((current) => ({ ...current, notes: event.target.value }))
+                    }
+                    rows={4}
+                  />
+                </label>
+
+                <label className="toggle-row field-full">
+                  <input
+                    type="checkbox"
+                    checked={draft.readOnly}
+                    onChange={(event) =>
+                      setDraft((current) => ({ ...current, readOnly: event.target.checked }))
+                    }
+                  />
+                  <div>
+                    <strong>Read-only relay mode</strong>
+                    <p>Keep the shell visible, but block client keystrokes and resizes.</p>
+                  </div>
+                </label>
+              </div>
+
+              <div className="action-row">
+                <button className="secondary-button" onClick={() => void saveSettings()} disabled={saving}>
+                  <Save size={16} />
+                  {saving ? 'Saving...' : 'Save host settings'}
+                </button>
+                <button className="primary-button" onClick={() => void openSession()} disabled={tokenLoading}>
+                  <KeyRound size={16} />
+                  {tokenLoading ? 'Issuing token...' : 'Open terminal'}
+                </button>
+              </div>
+            </>
+          ) : (
+            <p className="empty-state">Select a host from the left column to edit settings.</p>
+          )}
+        </section>
+      </section>
+
+      <section className="terminal-panel">
+        <div className="panel-header">
+          <div>
+            <p className="eyebrow">Remote shell</p>
+            <h2>Session runner</h2>
+          </div>
+          <TerminalSquare className="header-icon" />
+        </div>
+
+        {session ? (
+          <TerminalSession session={session} onClose={() => setSession(null)} />
+        ) : (
+          <div className="terminal-placeholder">
+            <p>Issue a client token from the host profile to start a session.</p>
+          </div>
         )}
-      </main>
-    </div>
+      </section>
+    </main>
   );
-};
-
-const App: React.FC = () => {
-  const [auth, setAuth] = useState<AuthData | null>(null);
-
-  return (
-    <div className="min-h-screen">
-      {!auth ? (
-        <Login onLogin={setAuth} />
-      ) : (
-        <TerminalView auth={auth} onDisconnect={() => setAuth(null)} />
-      )}
-    </div>
-  );
-};
-
-export default App;
+}

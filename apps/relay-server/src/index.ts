@@ -30,11 +30,6 @@ interface HostRecord {
   settings: HostSettings;
 }
 
-interface RelayTokenPayload {
-  hostId: string;
-  role: 'host' | 'client';
-}
-
 const app = express();
 app.use(express.json());
 app.use((_, res, next) => {

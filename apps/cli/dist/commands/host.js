@@ -1,40 +1,54 @@
 import { Command, Flags } from '@oclif/core';
+import os from 'node:os';
 import { WebSocket } from 'ws';
 import { terminal } from '@terminal-tool/protocol';
-import os from 'node:os';
 export default class Host extends Command {
-    static description = 'Expose local terminal to the relay server';
+    static description = 'Expose a local PTY to the relay server';
     static flags = {
         server: Flags.string({ char: 's', description: 'Relay server URL', required: true }),
         hostId: Flags.string({ char: 'i', description: 'Stable host ID' }),
         password: Flags.string({ char: 'p', description: 'Admin password for registration', required: true }),
         shell: Flags.string({ description: 'Shell executable override' }),
         cwd: Flags.string({ description: 'Working directory', default: process.cwd() }),
+        displayName: Flags.string({ description: 'Display name shown in the dashboard' }),
+        notes: Flags.string({ description: 'Host notes shown in the dashboard' }),
+        welcomeMessage: Flags.string({ description: 'Message shown to connecting clients' }),
+        readOnly: Flags.boolean({ description: 'Block client input at the relay layer' }),
     };
     async run() {
         const { flags } = await this.parse(Host);
         let ptyModule;
         try {
-            ptyModule = await import('node-pty');
+            ptyModule = (await import('node-pty'));
         }
         catch {
-            this.error('node-pty is required for host mode. Please install build tools and retry.');
+            this.error('node-pty is required for host mode. Install build tools and retry.');
         }
-        const shell = flags.shell || (os.platform() === 'win32' ? 'powershell.exe' : (process.env.SHELL || 'bash'));
+        const shell = flags.shell || (os.platform() === 'win32' ? 'powershell.exe' : process.env.SHELL || 'bash');
+        const hostId = flags.hostId || `${os.hostname().toLowerCase()}-${cryptoRandomId()}`;
+        await this.persistHostSettings(flags.server, hostId, flags.password, {
+            displayName: flags.displayName,
+            notes: flags.notes,
+            welcomeMessage: flags.welcomeMessage,
+            readOnly: flags.readOnly,
+            preferredShell: shell,
+            preferredCwd: flags.cwd,
+        });
         const wsUrl = new URL(flags.server);
         wsUrl.protocol = wsUrl.protocol === 'https:' ? 'wss:' : 'ws:';
         wsUrl.pathname = '/ws/host';
         const ws = new WebSocket(wsUrl.toString());
-        const send = (msg) => {
+        const sessions = new Map();
+        const send = (message) => {
             if (ws.readyState === WebSocket.OPEN) {
-                ws.send(terminal.HostMessage.encode(msg).finish());
+                ws.send(terminal.HostMessage.encode(message).finish());
             }
         };
-        const sessions = new Map();
         const createSession = (clientId) => {
-            if (sessions.has(clientId))
+            if (sessions.has(clientId)) {
                 return sessions.get(clientId);
-            this.log(`Spawning new PTY for client: ${clientId}`);
+            }
+            this.log(`Spawning PTY for client ${clientId}`);
             const proc = ptyModule.spawn(shell, [], {
                 name: 'xterm-256color',
                 cols: 80,
@@ -46,7 +60,7 @@ export default class Host extends Command {
                 send({ ptyOutput: { data, clientId } });
             });
             proc.onExit(({ exitCode }) => {
-                this.log(`PTY for client ${clientId} exited with code ${exitCode}`);
+                this.log(`PTY for ${clientId} exited with code ${exitCode}`);
                 send({ ptyExit: { code: exitCode, clientId } });
                 sessions.delete(clientId);
             });
@@ -54,65 +68,65 @@ export default class Host extends Command {
             return proc;
         };
         ws.on('open', () => {
-            this.log('Connected to relay. Registering host...');
+            this.log(`Connected to relay. Registering host ${hostId}...`);
             send({
                 registerHost: {
-                    hostId: flags.hostId,
+                    hostId,
                     password: flags.password,
                 },
             });
         });
         ws.on('message', (data) => {
-            // First try to decode as ServerMessage (Auth/Register responses)
             try {
-                const serverMsg = terminal.ServerMessage.decode(new Uint8Array(data));
-                if (serverMsg.registerHostResponse) {
-                    if (serverMsg.registerHostResponse.ok) {
-                        this.log(`Host registered successfully! ID: ${flags.hostId || 'auto-generated'}`);
-                        this.log(`Token: ${serverMsg.registerHostResponse.token}`);
+                const serverMessage = terminal.ServerMessage.decode(new Uint8Array(data));
+                if (serverMessage.registerHostResponse) {
+                    if (!serverMessage.registerHostResponse.ok) {
+                        this.error(`Registration failed: ${serverMessage.registerHostResponse.error}`);
                     }
-                    else {
-                        this.error(`Registration failed: ${serverMsg.registerHostResponse.error}`);
-                    }
+                    this.log(`Host ready: ${hostId}`);
+                    this.log(`Reuse token: ${serverMessage.registerHostResponse.token}`);
                     return;
                 }
-                if (serverMsg.authResponse) {
-                    if (serverMsg.authResponse.ok) {
-                        this.log('Authenticated via token.');
+                if (serverMessage.authResponse) {
+                    if (!serverMessage.authResponse.ok) {
+                        this.error(`Authentication failed: ${serverMessage.authResponse.error}`);
                     }
-                    else {
-                        this.error(`Auth failed: ${serverMsg.authResponse.error}`);
-                    }
+                    this.log(`Host authenticated: ${hostId}`);
                     return;
                 }
-                if (serverMsg.systemMessage) {
-                    this.log(`[System] ${serverMsg.systemMessage.message}`);
+                if (serverMessage.systemMessage) {
+                    this.log(`[System] ${serverMessage.systemMessage.message}`);
                     return;
                 }
-                if (serverMsg.errorMessage) {
-                    this.warn(`[Error] ${serverMsg.errorMessage.message}`);
+                if (serverMessage.errorMessage) {
+                    this.warn(`[Error] ${serverMessage.errorMessage.message}`);
                     return;
                 }
             }
-            catch { /* Ignore */ }
-            // Then try to decode as ClientMessage (PTY Input/Resize)
+            catch {
+                // Host also receives client messages after registration.
+            }
             try {
-                const clientMsg = terminal.ClientMessage.decode(new Uint8Array(data));
-                const clientId = clientMsg.clientId;
-                if (!clientId)
+                const clientMessage = terminal.ClientMessage.decode(new Uint8Array(data));
+                const clientId = clientMessage.clientId;
+                if (!clientId) {
                     return;
+                }
                 const proc = createSession(clientId);
-                if (clientMsg.ptyInput) {
-                    proc.write(clientMsg.ptyInput.data || '');
+                if (clientMessage.ptyInput) {
+                    proc.write(clientMessage.ptyInput.data || '');
+                    return;
                 }
-                else if (clientMsg.ptyResize) {
-                    proc.resize(clientMsg.ptyResize.cols || 80, clientMsg.ptyResize.rows || 24);
+                if (clientMessage.ptyResize) {
+                    proc.resize(clientMessage.ptyResize.cols || 80, clientMessage.ptyResize.rows || 24);
                 }
             }
-            catch { /* Ignore */ }
+            catch {
+                this.warn('Received unreadable client payload');
+            }
         });
-        ws.on('error', (err) => {
-            this.error(`WebSocket error: ${err.message}`);
+        ws.on('error', (error) => {
+            this.error(`WebSocket error: ${error.message}`);
         });
         ws.on('close', () => {
             this.log('Disconnected from relay.');
@@ -122,4 +136,20 @@ export default class Host extends Command {
             process.exit(0);
         });
     }
+    async persistHostSettings(server, hostId, password, patch) {
+        const response = await fetch(new URL(`/api/hosts/${hostId}/settings`, server), {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ password, ...patch }),
+        });
+        if (!response.ok) {
+            const payload = (await response.json().catch(() => ({})));
+            this.error(payload.error || `Failed to store host settings (${response.status})`);
+        }
+        const payload = (await response.json());
+        this.log(`Dashboard profile updated as "${payload.item.settings.displayName}"`);
+    }
+}
+function cryptoRandomId() {
+    return Math.random().toString(36).slice(2, 8);
 }

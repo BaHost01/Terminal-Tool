@@ -1,34 +1,79 @@
+import crypto from 'node:crypto';
+import http from 'node:http';
 import express from 'express';
-import { WebSocketServer, WebSocket } from 'ws';
-import jwt from 'jsonwebtoken';
-import http from 'http';
+import { WebSocket, WebSocketServer } from 'ws';
 import { terminal } from '@terminal-tool/protocol';
-import crypto from 'crypto';
+import { TokenService } from './token-service.js';
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0';
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-key-do-not-use-in-prod';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin';
 const app = express();
 app.use(express.json());
-app.get('/health', (req, res) => {
-    res.json({ ok: true, status: 'healthy', version: '2.0.0' });
+app.use((_, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PATCH,OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    next();
+});
+app.options('*', (_, res) => {
+    res.sendStatus(204);
 });
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, maxPayload: 1024 * 1024 });
-const activeSessions = new Map();
-function getSession(hostId) {
-    let session = activeSessions.get(hostId);
-    if (!session) {
-        session = { hostId, hostSocket: null, clientSockets: new Map() };
-        activeSessions.set(hostId, session);
+const hosts = new Map();
+function nowIso() {
+    return new Date().toISOString();
+}
+function createDefaultSettings(hostId) {
+    return {
+        displayName: `Host ${hostId.slice(0, 8)}`,
+        notes: '',
+        readOnly: false,
+        welcomeMessage: '',
+        preferredShell: '',
+        preferredCwd: '',
+    };
+}
+function getHost(hostId) {
+    const existing = hosts.get(hostId);
+    if (existing) {
+        return existing;
     }
-    return session;
+    const created = {
+        hostId,
+        hostSocket: null,
+        clientSockets: new Map(),
+        createdAt: nowIso(),
+        lastSeenAt: null,
+        lastClientAt: null,
+        settings: createDefaultSettings(hostId),
+    };
+    hosts.set(hostId, created);
+    return created;
+}
+function summarizeHost(host) {
+    return {
+        hostId: host.hostId,
+        online: Boolean(host.hostSocket && host.hostSocket.readyState === WebSocket.OPEN),
+        clients: host.clientSockets.size,
+        createdAt: host.createdAt,
+        lastSeenAt: host.lastSeenAt,
+        lastClientAt: host.lastClientAt,
+        settings: host.settings,
+    };
+}
+function signToken(payload) {
+    return TokenService.signToken(payload);
+}
+function verifyToken(token, expectedRole) {
+    return TokenService.verifyToken(token, expectedRole);
 }
 function sendServerMessage(socket, message) {
-    if (socket.readyState === WebSocket.OPEN) {
-        const buffer = terminal.ServerMessage.encode(message).finish();
-        socket.send(buffer);
+    if (socket.readyState !== WebSocket.OPEN) {
+        return;
     }
+    socket.send(terminal.ServerMessage.encode(message).finish());
 }
 function sendSystemMessage(socket, text) {
     sendServerMessage(socket, { systemMessage: { message: text } });
@@ -36,11 +81,81 @@ function sendSystemMessage(socket, text) {
 function sendErrorMessage(socket, text) {
     sendServerMessage(socket, { errorMessage: { message: text } });
 }
+function authenticatePassword(password) {
+    return password === ADMIN_PASSWORD;
+}
+function sanitizeSettings(input) {
+    return {
+        displayName: typeof input.displayName === 'string' ? input.displayName.trim() : undefined,
+        notes: typeof input.notes === 'string' ? input.notes.trim() : undefined,
+        readOnly: typeof input.readOnly === 'boolean' ? input.readOnly : undefined,
+        welcomeMessage: typeof input.welcomeMessage === 'string' ? input.welcomeMessage.trim() : undefined,
+        preferredShell: typeof input.preferredShell === 'string' ? input.preferredShell.trim() : undefined,
+        preferredCwd: typeof input.preferredCwd === 'string' ? input.preferredCwd.trim() : undefined,
+    };
+}
+app.get('/health', (_, res) => {
+    res.json({
+        ok: true,
+        status: 'healthy',
+        hosts: hosts.size,
+        version: '3.0.0',
+    });
+});
+app.get('/api/hosts', (_, res) => {
+    const items = [...hosts.values()]
+        .map(summarizeHost)
+        .sort((left, right) => left.hostId.localeCompare(right.hostId));
+    res.json({ items });
+});
+app.get('/api/hosts/:hostId', (req, res) => {
+    const host = hosts.get(req.params.hostId);
+    if (!host) {
+        res.status(404).json({ error: 'Host not found' });
+        return;
+    }
+    res.json({
+        item: summarizeHost(host),
+    });
+});
+app.post('/api/hosts/:hostId/client-token', (req, res) => {
+    if (!authenticatePassword(req.body?.password)) {
+        res.status(401).json({ error: 'Invalid admin password' });
+        return;
+    }
+    const host = getHost(req.params.hostId);
+    host.lastClientAt = nowIso();
+    res.json({
+        token: signToken({ hostId: host.hostId, role: 'client' }),
+        host: summarizeHost(host),
+    });
+});
+app.patch('/api/hosts/:hostId/settings', (req, res) => {
+    if (!authenticatePassword(req.body?.password)) {
+        res.status(401).json({ error: 'Invalid admin password' });
+        return;
+    }
+    const host = getHost(req.params.hostId);
+    const patch = sanitizeSettings(req.body ?? {});
+    host.settings = {
+        ...host.settings,
+        ...Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined)),
+    };
+    if (!host.settings.displayName) {
+        host.settings.displayName = createDefaultSettings(host.hostId).displayName;
+    }
+    if (host.hostSocket) {
+        sendSystemMessage(host.hostSocket, 'Host settings updated from dashboard');
+    }
+    res.json({
+        item: summarizeHost(host),
+    });
+});
 wss.on('connection', (socket, req) => {
     const url = new URL(req.url || '', `http://${req.headers.host}`);
     const role = url.pathname === '/ws/host' ? 'host' : url.pathname === '/ws/client' ? 'client' : null;
     if (!role) {
-        socket.close(1008, 'Invalid role');
+        socket.close(1008, 'Invalid websocket path');
         return;
     }
     let authenticated = false;
@@ -48,149 +163,188 @@ wss.on('connection', (socket, req) => {
     const clientId = crypto.randomUUID();
     socket.on('message', (data) => {
         if (role === 'host') {
-            let hostMsg;
+            let hostMessage;
             try {
-                hostMsg = terminal.HostMessage.decode(new Uint8Array(data));
+                hostMessage = terminal.HostMessage.decode(new Uint8Array(data));
             }
             catch {
-                return sendErrorMessage(socket, 'Invalid protobuf payload');
+                sendErrorMessage(socket, 'Invalid protobuf payload');
+                return;
             }
             if (!authenticated) {
-                if (hostMsg.registerHost) {
-                    if (hostMsg.registerHost.password !== ADMIN_PASSWORD) {
-                        return sendServerMessage(socket, { registerHostResponse: { ok: false, error: 'Invalid password' } });
-                    }
-                    const hostId = hostMsg.registerHost.hostId || crypto.randomUUID();
-                    const token = jwt.sign({ hostId, role: 'host' }, JWT_SECRET, { expiresIn: '7d' });
-                    authenticated = true;
-                    currentHostId = hostId;
-                    const session = getSession(hostId);
-                    if (session.hostSocket) {
-                        sendSystemMessage(session.hostSocket, 'Another host instance connected');
-                        session.hostSocket.close(1008, 'Conflict');
-                    }
-                    session.hostSocket = socket;
-                    sendServerMessage(socket, { registerHostResponse: { ok: true, token } });
-                    return;
-                }
-                if (hostMsg.authRequest) {
-                    try {
-                        const decoded = jwt.verify(hostMsg.authRequest.token || '', JWT_SECRET);
-                        if (decoded.role !== 'host')
-                            throw new Error('Invalid role');
-                        currentHostId = hostMsg.authRequest.hostId || decoded.hostId;
-                        authenticated = true;
-                        const session = getSession(currentHostId);
-                        if (session.hostSocket) {
-                            session.hostSocket.close(1008, 'Conflict');
+                try {
+                    if (hostMessage.registerHost) {
+                        if (!authenticatePassword(hostMessage.registerHost.password)) {
+                            sendServerMessage(socket, {
+                                registerHostResponse: { ok: false, error: 'Invalid password' },
+                            });
+                            return;
                         }
-                        session.hostSocket = socket;
-                        sendServerMessage(socket, { authResponse: { ok: true } });
-                        sendSystemMessage(socket, 'Host authenticated successfully');
-                    }
-                    catch (e) {
-                        sendServerMessage(socket, { authResponse: { ok: false, error: e.message } });
-                    }
-                    return;
-                }
-                return sendErrorMessage(socket, 'Not authenticated');
-            }
-            const session = getSession(currentHostId);
-            if (hostMsg.ptyOutput) {
-                const targetClientId = hostMsg.ptyOutput.clientId;
-                if (targetClientId) {
-                    const target = session.clientSockets.get(targetClientId);
-                    if (target)
-                        sendServerMessage(target, { ptyOutput: hostMsg.ptyOutput });
-                }
-                else {
-                    for (const client of session.clientSockets.values()) {
-                        sendServerMessage(client, { ptyOutput: hostMsg.ptyOutput });
-                    }
-                }
-            }
-            else if (hostMsg.ptyExit) {
-                const targetClientId = hostMsg.ptyExit.clientId;
-                if (targetClientId) {
-                    const target = session.clientSockets.get(targetClientId);
-                    if (target)
-                        sendServerMessage(target, { ptyExit: hostMsg.ptyExit });
-                }
-                else {
-                    for (const client of session.clientSockets.values()) {
-                        sendServerMessage(client, { ptyExit: hostMsg.ptyExit });
-                    }
-                }
-            }
-        }
-        else if (role === 'client') {
-            let clientMsg;
-            try {
-                clientMsg = terminal.ClientMessage.decode(new Uint8Array(data));
-            }
-            catch {
-                return sendErrorMessage(socket, 'Invalid protobuf payload');
-            }
-            if (!authenticated) {
-                if (clientMsg.registerHost) {
-                    if (clientMsg.registerHost.password !== ADMIN_PASSWORD) {
-                        return sendServerMessage(socket, { registerHostResponse: { ok: false, error: 'Invalid password' } });
-                    }
-                    const hostId = clientMsg.registerHost.hostId;
-                    if (!hostId)
-                        return sendErrorMessage(socket, 'hostId required');
-                    const token = jwt.sign({ hostId, role: 'client' }, JWT_SECRET, { expiresIn: '7d' });
-                    authenticated = true;
-                    currentHostId = hostId;
-                    getSession(hostId).clientSockets.set(clientId, socket);
-                    sendServerMessage(socket, { registerHostResponse: { ok: true, token } });
-                    sendSystemMessage(socket, `Client connected as ${clientId}`);
-                    return;
-                }
-                if (clientMsg.authRequest) {
-                    try {
-                        const decoded = jwt.verify(clientMsg.authRequest.token || '', JWT_SECRET);
-                        currentHostId = clientMsg.authRequest.hostId || decoded.hostId;
+                        currentHostId = hostMessage.registerHost.hostId || crypto.randomUUID();
+                        const host = getHost(currentHostId);
+                        host.lastSeenAt = nowIso();
+                        if (host.hostSocket && host.hostSocket !== socket) {
+                            sendSystemMessage(host.hostSocket, 'Another host session replaced this connection');
+                            host.hostSocket.close(1008, 'Host connection replaced');
+                        }
+                        host.hostSocket = socket;
                         authenticated = true;
-                        getSession(currentHostId).clientSockets.set(clientId, socket);
-                        sendServerMessage(socket, { authResponse: { ok: true } });
-                        sendSystemMessage(socket, `Client authenticated as ${clientId}`);
+                        sendServerMessage(socket, {
+                            registerHostResponse: {
+                                ok: true,
+                                token: signToken({ hostId: currentHostId, role: 'host' }),
+                            },
+                        });
+                        sendSystemMessage(socket, `Host ${currentHostId} registered`);
+                        return;
                     }
-                    catch (e) {
-                        sendServerMessage(socket, { authResponse: { ok: false, error: e.message } });
+                    if (hostMessage.authRequest) {
+                        const decoded = verifyToken(hostMessage.authRequest.token || '', 'host');
+                        currentHostId = hostMessage.authRequest.hostId || decoded.hostId;
+                        const host = getHost(currentHostId);
+                        host.lastSeenAt = nowIso();
+                        if (host.hostSocket && host.hostSocket !== socket) {
+                            host.hostSocket.close(1008, 'Host connection replaced');
+                        }
+                        host.hostSocket = socket;
+                        authenticated = true;
+                        sendServerMessage(socket, { authResponse: { ok: true } });
+                        sendSystemMessage(socket, `Host ${currentHostId} authenticated`);
+                        return;
+                    }
+                    sendErrorMessage(socket, 'Host must authenticate before sending PTY data');
+                    return;
+                }
+                catch (error) {
+                    const message = error instanceof Error ? error.message : 'Authentication failed';
+                    sendServerMessage(socket, { authResponse: { ok: false, error: message } });
+                    return;
+                }
+            }
+            const host = getHost(currentHostId);
+            host.lastSeenAt = nowIso();
+            if (hostMessage.ptyOutput) {
+                const targetClientId = hostMessage.ptyOutput.clientId;
+                if (targetClientId) {
+                    const target = host.clientSockets.get(targetClientId);
+                    if (target) {
+                        sendServerMessage(target, { ptyOutput: hostMessage.ptyOutput });
+                    }
+                }
+                else {
+                    for (const clientSocket of host.clientSockets.values()) {
+                        sendServerMessage(clientSocket, { ptyOutput: hostMessage.ptyOutput });
+                    }
+                }
+            }
+            if (hostMessage.ptyExit) {
+                const targetClientId = hostMessage.ptyExit.clientId;
+                if (targetClientId) {
+                    const target = host.clientSockets.get(targetClientId);
+                    if (target) {
+                        sendServerMessage(target, { ptyExit: hostMessage.ptyExit });
+                    }
+                }
+                else {
+                    for (const clientSocket of host.clientSockets.values()) {
+                        sendServerMessage(clientSocket, { ptyExit: hostMessage.ptyExit });
+                    }
+                }
+            }
+            return;
+        }
+        let clientMessage;
+        try {
+            clientMessage = terminal.ClientMessage.decode(new Uint8Array(data));
+        }
+        catch {
+            sendErrorMessage(socket, 'Invalid protobuf payload');
+            return;
+        }
+        if (!authenticated) {
+            try {
+                if (clientMessage.registerHost) {
+                    if (!authenticatePassword(clientMessage.registerHost.password)) {
+                        sendServerMessage(socket, {
+                            registerHostResponse: { ok: false, error: 'Invalid password' },
+                        });
+                        return;
+                    }
+                    if (!clientMessage.registerHost.hostId) {
+                        sendErrorMessage(socket, 'hostId required');
+                        return;
+                    }
+                    currentHostId = clientMessage.registerHost.hostId;
+                    const host = getHost(currentHostId);
+                    host.clientSockets.set(clientId, socket);
+                    host.lastClientAt = nowIso();
+                    authenticated = true;
+                    sendServerMessage(socket, {
+                        registerHostResponse: {
+                            ok: true,
+                            token: signToken({ hostId: currentHostId, role: 'client' }),
+                        },
+                    });
+                    sendSystemMessage(socket, `Client connected as ${clientId}`);
+                    if (host.settings.welcomeMessage) {
+                        sendSystemMessage(socket, host.settings.welcomeMessage);
                     }
                     return;
                 }
-                return sendErrorMessage(socket, 'Not authenticated');
-            }
-            const session = getSession(currentHostId);
-            if (!session.hostSocket) {
-                return sendErrorMessage(socket, 'Host is offline');
-            }
-            if (clientMsg.ptyInput || clientMsg.ptyResize) {
-                if (session.hostSocket.readyState === WebSocket.OPEN) {
-                    // Inject clientId before forwarding
-                    clientMsg.clientId = clientId;
-                    const buffer = terminal.ClientMessage.encode(clientMsg).finish();
-                    session.hostSocket.send(buffer);
+                if (clientMessage.authRequest) {
+                    const decoded = verifyToken(clientMessage.authRequest.token || '', 'client');
+                    currentHostId = clientMessage.authRequest.hostId || decoded.hostId;
+                    const host = getHost(currentHostId);
+                    host.clientSockets.set(clientId, socket);
+                    host.lastClientAt = nowIso();
+                    authenticated = true;
+                    sendServerMessage(socket, { authResponse: { ok: true } });
+                    sendSystemMessage(socket, `Client authenticated as ${clientId}`);
+                    if (host.settings.welcomeMessage) {
+                        sendSystemMessage(socket, host.settings.welcomeMessage);
+                    }
+                    return;
                 }
+                sendErrorMessage(socket, 'Client must authenticate before sending PTY data');
             }
+            catch (error) {
+                const message = error instanceof Error ? error.message : 'Authentication failed';
+                sendServerMessage(socket, { authResponse: { ok: false, error: message } });
+            }
+            return;
+        }
+        const host = getHost(currentHostId);
+        if (!host.hostSocket || host.hostSocket.readyState !== WebSocket.OPEN) {
+            sendErrorMessage(socket, 'Host is offline');
+            return;
+        }
+        if (host.settings.readOnly) {
+            sendErrorMessage(socket, 'Host is currently in read-only mode');
+            return;
+        }
+        if (clientMessage.ptyInput || clientMessage.ptyResize) {
+            clientMessage.clientId = clientId;
+            host.hostSocket.send(terminal.ClientMessage.encode(clientMessage).finish());
         }
     });
     socket.on('close', () => {
-        if (currentHostId) {
-            const session = getSession(currentHostId);
-            if (role === 'host' && session.hostSocket === socket) {
-                session.hostSocket = null;
-                for (const client of session.clientSockets.values()) {
-                    sendSystemMessage(client, 'Host disconnected');
-                }
+        if (!currentHostId) {
+            return;
+        }
+        const host = getHost(currentHostId);
+        if (role === 'host' && host.hostSocket === socket) {
+            host.hostSocket = null;
+            host.lastSeenAt = nowIso();
+            for (const clientSocket of host.clientSockets.values()) {
+                sendSystemMessage(clientSocket, 'Host disconnected');
             }
-            else if (role === 'client') {
-                session.clientSockets.delete(clientId);
-                if (session.hostSocket) {
-                    sendSystemMessage(session.hostSocket, `Client ${clientId} disconnected`);
-                }
+            return;
+        }
+        if (role === 'client') {
+            host.clientSockets.delete(clientId);
+            host.lastClientAt = nowIso();
+            if (host.hostSocket) {
+                sendSystemMessage(host.hostSocket, `Client ${clientId} disconnected`);
             }
         }
     });
