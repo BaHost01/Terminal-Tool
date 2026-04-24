@@ -3,10 +3,12 @@
   "version": "2.0.0",
   "private": true,
   "scripts": {
-    "build": "pnpm -r run build",
-    "dev": "pnpm -r run dev",
-    "lint": "pnpm -r run lint",
-    "test": "pnpm -r run test"
+    "build": "pnpm -r --if-present run build",
+    "dev": "pnpm -r --if-present run dev",
+    "lint": "pnpm -r --if-present run lint",
+    "test": "pnpm -r --if-present run test",
+    "check": "pnpm lint && pnpm build",
+    "serve": "tsx src/index.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -18,5 +20,12 @@
   "packageManager": "pnpm@9.5.0",
   "engines": {
     "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@terminal-tool/protocol": "workspace:^",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "tsx": "^4.16.2",
+    "ws": "^8.18.0"
   }
 }

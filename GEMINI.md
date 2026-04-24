@@ -29,6 +29,12 @@ This project is a cross-platform remote terminal sharing solution. It allows use
 - `pnpm dev`: Start all components in development mode.
 - `pnpm lint`: Run ESLint across the monorepo.
 
+### Root Relay Server (`src/`)
+A production-ready relay server is also available at the root level.
+- `pnpm run serve`: Start the root relay server (uses `src/index.ts`).
+- **Features:** Includes built-in Discord webhook notifications for host registrations.
+- **Env Vars:** `PORT` (default 3000), `ADMIN_PASSWORD`, `JWT_SECRET`.
+
 ### Relay Server (`apps/relay-server`)
 - `pnpm start`: Start the relay server.
 - **Default Public Relay:** `https://terminal-tool.onrender.com/`
