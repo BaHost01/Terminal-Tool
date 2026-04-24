@@ -39,7 +39,7 @@ app.use((_, res, next) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   next();
 });
-app.options('*', (_, res) => {
+app.options('(.*)', (_, res) => {
   res.sendStatus(204);
 });
 
