@@ -50,6 +50,7 @@ app.options('(.*)', (_, res) => {
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server, maxPayload: 1024 * 1024 });
 const hosts = new Map<string, HostRecord>();
+const tokens = new Map<string, string>(); // token -> hostId
 
 function nowIso() {
   return new Date().toISOString();
@@ -87,9 +88,6 @@ function getHost(hostId: string): HostRecord {
   hosts.set(hostId, created);
   return created;
 }
-
-const hosts = new Map<string, HostRecord>();
-const tokens = new Map<string, string>(); // token -> hostId
 
 function summarizeHost(host: HostRecord) {
   return {
