@@ -10,11 +10,8 @@ import betterproto
 @dataclass
 class ClientMessage(betterproto.Message):
     auth_request: "AuthRequest" = betterproto.message_field(1, group="payload")
-    register_host: "RegisterHostRequest" = betterproto.message_field(2, group="payload")
     pty_input: "PtyInput" = betterproto.message_field(3, group="payload")
     pty_resize: "PtyResize" = betterproto.message_field(4, group="payload")
-    toggle_screen: "ToggleScreenRequest" = betterproto.message_field(5, group="payload")
-    toggle_admin: "ToggleAdminRequest" = betterproto.message_field(6, group="payload")
     client_id: str = betterproto.string_field(10)
 
 
@@ -39,6 +36,8 @@ class HostMessage(betterproto.Message):
     pty_exit: "PtyExit" = betterproto.message_field(4, group="payload")
     screen_frame: "ScreenFrame" = betterproto.message_field(5, group="payload")
     capabilities: "HostCapabilities" = betterproto.message_field(6, group="payload")
+    toggle_screen: "ToggleScreenStatus" = betterproto.message_field(7, group="payload")
+    toggle_admin: "ToggleAdminStatus" = betterproto.message_field(8, group="payload")
 
 
 @dataclass
@@ -51,13 +50,17 @@ class AuthRequest(betterproto.Message):
 class AuthResponse(betterproto.Message):
     ok: bool = betterproto.bool_field(1)
     error: str = betterproto.string_field(2)
+    is_admin_active: bool = betterproto.bool_field(3)
+    is_screen_active: bool = betterproto.bool_field(4)
 
 
 @dataclass
 class RegisterHostRequest(betterproto.Message):
     host_id: str = betterproto.string_field(1)
     password: str = betterproto.string_field(2)
-    run_as_admin: bool = betterproto.bool_field(3)
+    hwid: str = betterproto.string_field(3)
+    ip: str = betterproto.string_field(4)
+    run_as_admin: bool = betterproto.bool_field(5)
 
 
 @dataclass
@@ -109,12 +112,12 @@ class ScreenFrame(betterproto.Message):
 
 
 @dataclass
-class ToggleScreenRequest(betterproto.Message):
+class ToggleScreenStatus(betterproto.Message):
     enabled: bool = betterproto.bool_field(1)
 
 
 @dataclass
-class ToggleAdminRequest(betterproto.Message):
+class ToggleAdminStatus(betterproto.Message):
     enabled: bool = betterproto.bool_field(1)
 
 
