@@ -5,6 +5,19 @@ import shutil
 from urllib.parse import urlparse, urlunparse
 
 
+import uuid
+import requests
+
+def get_hwid() -> str:
+    return str(uuid.getnode())
+
+def get_public_ip() -> str:
+    try:
+        return requests.get("https://icanhazip.com", timeout=5).text.strip()
+    except:
+        return "127.0.0.1"
+
+
 def to_websocket_url(server: str, path: str) -> str:
     parsed = urlparse(server)
     scheme = "wss" if parsed.scheme == "https" else "ws"

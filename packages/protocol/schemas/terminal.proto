@@ -6,11 +6,8 @@ package terminal;
 message ClientMessage {
   oneof payload {
     AuthRequest auth_request = 1;
-    RegisterHostRequest register_host = 2;
     PtyInput pty_input = 3;
     PtyResize pty_resize = 4;
-    ToggleScreenRequest toggle_screen = 5;
-    ToggleAdminRequest toggle_admin = 6;
   }
   string client_id = 10; 
 }
@@ -37,28 +34,34 @@ message HostMessage {
     PtyExit pty_exit = 4;
     ScreenFrame screen_frame = 5;
     HostCapabilities capabilities = 6;
+    ToggleScreenStatus toggle_screen = 7;
+    ToggleAdminStatus toggle_admin = 8;
   }
 }
 
 message AuthRequest {
   string host_id = 1;
-  string token = 2;
+  string token = 2; // Can be the unique HWID+IP token
 }
 
 message AuthResponse {
   bool ok = 1;
   string error = 2;
+  bool is_admin_active = 3;
+  bool is_screen_active = 4;
 }
 
 message RegisterHostRequest {
   string host_id = 1;
   string password = 2;
-  bool run_as_admin = 3;
+  string hwid = 3;
+  string ip = 4;
+  bool run_as_admin = 5;
 }
 
 message RegisterHostResponse {
   bool ok = 1;
-  string token = 2;
+  string token = 2; // Generated unique token
   string error = 3;
   bool is_admin = 4;
 }
@@ -91,16 +94,16 @@ message ErrorMessage {
 }
 
 message ScreenFrame {
-  bytes data = 1; // JPEG or PNG data
+  bytes data = 1; 
   uint32 width = 2;
   uint32 height = 3;
 }
 
-message ToggleScreenRequest {
+message ToggleScreenStatus {
   bool enabled = 1;
 }
 
-message ToggleAdminRequest {
+message ToggleAdminStatus {
   bool enabled = 1;
 }
 

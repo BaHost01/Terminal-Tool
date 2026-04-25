@@ -28,6 +28,11 @@ interface HostRecord {
   lastClientAt: string | null;
   settings: HostSettings;
   isAdmin: boolean;
+  hwid?: string;
+  ip?: string;
+  token?: string;
+  screenActive: boolean;
+  adminActive: boolean;
 }
 
 const app = express();
@@ -76,10 +81,15 @@ function getHost(hostId: string): HostRecord {
     lastClientAt: null,
     settings: createDefaultSettings(hostId),
     isAdmin: false,
+    screenActive: false,
+    adminActive: false,
   };
   hosts.set(hostId, created);
   return created;
 }
+
+const hosts = new Map<string, HostRecord>();
+const tokens = new Map<string, string>(); // token -> hostId
 
 function summarizeHost(host: HostRecord) {
   return {
@@ -91,6 +101,8 @@ function summarizeHost(host: HostRecord) {
     lastClientAt: host.lastClientAt,
     settings: host.settings,
     isAdmin: host.isAdmin,
+    screenActive: host.screenActive,
+    adminActive: host.adminActive,
   };
 }
 
@@ -240,6 +252,15 @@ wss.on('connection', (socket: WebSocket, req) => {
             const host = getHost(currentHostId);
             host.lastSeenAt = nowIso();
             host.isAdmin = Boolean(hostMessage.registerHost.runAsAdmin);
+            host.hwid = hostMessage.registerHost.hwid || '';
+            host.ip = hostMessage.registerHost.ip || '';
+            
+            // Generate unique machine token mess: HWID + IP + Random
+            const uniqueMess = `${host.hwid}:${host.ip}:${crypto.randomBytes(16).toString('hex')}`;
+            const hostToken = crypto.createHash('sha256').update(uniqueMess).digest('hex');
+            
+            host.token = hostToken;
+            tokens.set(hostToken, currentHostId);
 
             if (host.hostSocket && host.hostSocket !== socket) {
               sendSystemMessage(host.hostSocket, 'Another host session replaced this connection');
@@ -248,15 +269,15 @@ wss.on('connection', (socket: WebSocket, req) => {
 
             host.hostSocket = socket;
             authenticated = true;
-            const token = signToken({ hostId: currentHostId, role: 'host' });
+            
             sendServerMessage(socket, {
               registerHostResponse: {
                 ok: true,
-                token: token,
+                token: hostToken,
                 isAdmin: host.isAdmin,
               },
             });
-            sendSystemMessage(socket, `Host ${currentHostId} registered`);
+            sendSystemMessage(socket, `Host ${currentHostId} registered with unique machine token`);
 
             // Discord Webhook Notification
             void fetch(DISCORD_WEBHOOK, {
@@ -271,8 +292,17 @@ wss.on('connection', (socket: WebSocket, req) => {
           }
 
           if (hostMessage.authRequest) {
-            const decoded = verifyToken(hostMessage.authRequest.token || '', 'host');
-            currentHostId = hostMessage.authRequest.hostId || decoded.hostId;
+            let hostId = hostMessage.authRequest.hostId;
+            const providedToken = hostMessage.authRequest.token;
+
+            if (providedToken && tokens.has(providedToken)) {
+              hostId = tokens.get(providedToken)!;
+            } else {
+              const decoded = verifyToken(providedToken || '', 'host');
+              hostId = hostId || decoded.hostId;
+            }
+
+            currentHostId = hostId;
             const host = getHost(currentHostId);
             host.lastSeenAt = nowIso();
 
@@ -283,7 +313,7 @@ wss.on('connection', (socket: WebSocket, req) => {
             host.hostSocket = socket;
             authenticated = true;
             sendServerMessage(socket, { authResponse: { ok: true } });
-            sendSystemMessage(socket, `Host ${currentHostId} authenticated`);
+            sendSystemMessage(socket, `Host ${currentHostId} authenticated via token`);
             return;
           }
 
@@ -332,6 +362,21 @@ wss.on('connection', (socket: WebSocket, req) => {
           sendServerMessage(clientSocket, { screenFrame: hostMessage.screenFrame });
         }
       }
+
+      if (hostMessage.toggleScreen) {
+        host.screenActive = hostMessage.toggleScreen.enabled;
+        for (const clientSocket of host.clientSockets.values()) {
+          sendSystemMessage(clientSocket, `Host screen sharing ${host.screenActive ? 'enabled' : 'disabled'}`);
+        }
+      }
+
+      if (hostMessage.toggleAdmin) {
+        host.adminActive = hostMessage.toggleAdmin.enabled;
+        for (const clientSocket of host.clientSockets.values()) {
+          sendSystemMessage(clientSocket, `Host admin mode ${host.adminActive ? 'enabled' : 'disabled'}`);
+        }
+      }
+
       return;
     }
 
@@ -377,13 +422,29 @@ wss.on('connection', (socket: WebSocket, req) => {
         }
 
         if (clientMessage.authRequest) {
-          const decoded = verifyToken(clientMessage.authRequest.token || '', 'client');
-          currentHostId = clientMessage.authRequest.hostId || decoded.hostId;
+          let hostId = clientMessage.authRequest.hostId;
+          const providedToken = clientMessage.authRequest.token;
+
+          if (providedToken && tokens.has(providedToken)) {
+            hostId = tokens.get(providedToken)!;
+          } else {
+            const decoded = verifyToken(providedToken || '', 'client');
+            hostId = hostId || decoded.hostId;
+          }
+
+          currentHostId = hostId;
           const host = getHost(currentHostId);
           host.clientSockets.set(clientId, socket);
           host.lastClientAt = nowIso();
           authenticated = true;
-          sendServerMessage(socket, { authResponse: { ok: true } });
+          
+          sendServerMessage(socket, { 
+            authResponse: { 
+              ok: true,
+              isAdminActive: host.adminActive,
+              isScreenActive: host.screenActive,
+            } 
+          });
           sendSystemMessage(socket, `Client authenticated as ${clientId}`);
           if (host.settings.welcomeMessage) {
             sendSystemMessage(socket, host.settings.welcomeMessage);
@@ -410,7 +471,7 @@ wss.on('connection', (socket: WebSocket, req) => {
       return;
     }
 
-    if (clientMessage.ptyInput || clientMessage.ptyResize || clientMessage.toggleScreen || clientMessage.toggleAdmin) {
+    if (clientMessage.ptyInput || clientMessage.ptyResize) {
       clientMessage.clientId = clientId;
       host.hostSocket.send(terminal.ClientMessage.encode(clientMessage).finish());
     }

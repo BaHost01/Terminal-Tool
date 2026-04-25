@@ -9,20 +9,11 @@ export namespace terminal {
         /** ClientMessage authRequest */
         authRequest?: (terminal.IAuthRequest|null);
 
-        /** ClientMessage registerHost */
-        registerHost?: (terminal.IRegisterHostRequest|null);
-
         /** ClientMessage ptyInput */
         ptyInput?: (terminal.IPtyInput|null);
 
         /** ClientMessage ptyResize */
         ptyResize?: (terminal.IPtyResize|null);
-
-        /** ClientMessage toggleScreen */
-        toggleScreen?: (terminal.IToggleScreenRequest|null);
-
-        /** ClientMessage toggleAdmin */
-        toggleAdmin?: (terminal.IToggleAdminRequest|null);
 
         /** ClientMessage clientId */
         clientId?: (string|null);
@@ -40,26 +31,17 @@ export namespace terminal {
         /** ClientMessage authRequest. */
         public authRequest?: (terminal.IAuthRequest|null);
 
-        /** ClientMessage registerHost. */
-        public registerHost?: (terminal.IRegisterHostRequest|null);
-
         /** ClientMessage ptyInput. */
         public ptyInput?: (terminal.IPtyInput|null);
 
         /** ClientMessage ptyResize. */
         public ptyResize?: (terminal.IPtyResize|null);
 
-        /** ClientMessage toggleScreen. */
-        public toggleScreen?: (terminal.IToggleScreenRequest|null);
-
-        /** ClientMessage toggleAdmin. */
-        public toggleAdmin?: (terminal.IToggleAdminRequest|null);
-
         /** ClientMessage clientId. */
         public clientId: string;
 
         /** ClientMessage payload. */
-        public payload?: ("authRequest"|"registerHost"|"ptyInput"|"ptyResize"|"toggleScreen"|"toggleAdmin");
+        public payload?: ("authRequest"|"ptyInput"|"ptyResize");
 
         /**
          * Creates a new ClientMessage instance using the specified properties.
@@ -295,6 +277,12 @@ export namespace terminal {
 
         /** HostMessage capabilities */
         capabilities?: (terminal.IHostCapabilities|null);
+
+        /** HostMessage toggleScreen */
+        toggleScreen?: (terminal.IToggleScreenStatus|null);
+
+        /** HostMessage toggleAdmin */
+        toggleAdmin?: (terminal.IToggleAdminStatus|null);
     }
 
     /** Represents a HostMessage. */
@@ -324,8 +312,14 @@ export namespace terminal {
         /** HostMessage capabilities. */
         public capabilities?: (terminal.IHostCapabilities|null);
 
+        /** HostMessage toggleScreen. */
+        public toggleScreen?: (terminal.IToggleScreenStatus|null);
+
+        /** HostMessage toggleAdmin. */
+        public toggleAdmin?: (terminal.IToggleAdminStatus|null);
+
         /** HostMessage payload. */
-        public payload?: ("authRequest"|"registerHost"|"ptyOutput"|"ptyExit"|"screenFrame"|"capabilities");
+        public payload?: ("authRequest"|"registerHost"|"ptyOutput"|"ptyExit"|"screenFrame"|"capabilities"|"toggleScreen"|"toggleAdmin");
 
         /**
          * Creates a new HostMessage instance using the specified properties.
@@ -516,6 +510,12 @@ export namespace terminal {
 
         /** AuthResponse error */
         error?: (string|null);
+
+        /** AuthResponse isAdminActive */
+        isAdminActive?: (boolean|null);
+
+        /** AuthResponse isScreenActive */
+        isScreenActive?: (boolean|null);
     }
 
     /** Represents an AuthResponse. */
@@ -532,6 +532,12 @@ export namespace terminal {
 
         /** AuthResponse error. */
         public error: string;
+
+        /** AuthResponse isAdminActive. */
+        public isAdminActive: boolean;
+
+        /** AuthResponse isScreenActive. */
+        public isScreenActive: boolean;
 
         /**
          * Creates a new AuthResponse instance using the specified properties.
@@ -620,6 +626,12 @@ export namespace terminal {
         /** RegisterHostRequest password */
         password?: (string|null);
 
+        /** RegisterHostRequest hwid */
+        hwid?: (string|null);
+
+        /** RegisterHostRequest ip */
+        ip?: (string|null);
+
         /** RegisterHostRequest runAsAdmin */
         runAsAdmin?: (boolean|null);
     }
@@ -638,6 +650,12 @@ export namespace terminal {
 
         /** RegisterHostRequest password. */
         public password: string;
+
+        /** RegisterHostRequest hwid. */
+        public hwid: string;
+
+        /** RegisterHostRequest ip. */
+        public ip: string;
 
         /** RegisterHostRequest runAsAdmin. */
         public runAsAdmin: boolean;
@@ -1544,194 +1562,194 @@ export namespace terminal {
         public static getTypeUrl(typeUrlPrefix?: string): string;
     }
 
-    /** Properties of a ToggleScreenRequest. */
-    interface IToggleScreenRequest {
+    /** Properties of a ToggleScreenStatus. */
+    interface IToggleScreenStatus {
 
-        /** ToggleScreenRequest enabled */
+        /** ToggleScreenStatus enabled */
         enabled?: (boolean|null);
     }
 
-    /** Represents a ToggleScreenRequest. */
-    class ToggleScreenRequest implements IToggleScreenRequest {
+    /** Represents a ToggleScreenStatus. */
+    class ToggleScreenStatus implements IToggleScreenStatus {
 
         /**
-         * Constructs a new ToggleScreenRequest.
+         * Constructs a new ToggleScreenStatus.
          * @param [properties] Properties to set
          */
-        constructor(properties?: terminal.IToggleScreenRequest);
+        constructor(properties?: terminal.IToggleScreenStatus);
 
-        /** ToggleScreenRequest enabled. */
+        /** ToggleScreenStatus enabled. */
         public enabled: boolean;
 
         /**
-         * Creates a new ToggleScreenRequest instance using the specified properties.
+         * Creates a new ToggleScreenStatus instance using the specified properties.
          * @param [properties] Properties to set
-         * @returns ToggleScreenRequest instance
+         * @returns ToggleScreenStatus instance
          */
-        public static create(properties?: terminal.IToggleScreenRequest): terminal.ToggleScreenRequest;
+        public static create(properties?: terminal.IToggleScreenStatus): terminal.ToggleScreenStatus;
 
         /**
-         * Encodes the specified ToggleScreenRequest message. Does not implicitly {@link terminal.ToggleScreenRequest.verify|verify} messages.
-         * @param message ToggleScreenRequest message or plain object to encode
+         * Encodes the specified ToggleScreenStatus message. Does not implicitly {@link terminal.ToggleScreenStatus.verify|verify} messages.
+         * @param message ToggleScreenStatus message or plain object to encode
          * @param [writer] Writer to encode to
          * @returns Writer
          */
-        public static encode(message: terminal.IToggleScreenRequest, writer?: $protobuf.Writer): $protobuf.Writer;
+        public static encode(message: terminal.IToggleScreenStatus, writer?: $protobuf.Writer): $protobuf.Writer;
 
         /**
-         * Encodes the specified ToggleScreenRequest message, length delimited. Does not implicitly {@link terminal.ToggleScreenRequest.verify|verify} messages.
-         * @param message ToggleScreenRequest message or plain object to encode
+         * Encodes the specified ToggleScreenStatus message, length delimited. Does not implicitly {@link terminal.ToggleScreenStatus.verify|verify} messages.
+         * @param message ToggleScreenStatus message or plain object to encode
          * @param [writer] Writer to encode to
          * @returns Writer
          */
-        public static encodeDelimited(message: terminal.IToggleScreenRequest, writer?: $protobuf.Writer): $protobuf.Writer;
+        public static encodeDelimited(message: terminal.IToggleScreenStatus, writer?: $protobuf.Writer): $protobuf.Writer;
 
         /**
-         * Decodes a ToggleScreenRequest message from the specified reader or buffer.
+         * Decodes a ToggleScreenStatus message from the specified reader or buffer.
          * @param reader Reader or buffer to decode from
          * @param [length] Message length if known beforehand
-         * @returns ToggleScreenRequest
+         * @returns ToggleScreenStatus
          * @throws {Error} If the payload is not a reader or valid buffer
          * @throws {$protobuf.util.ProtocolError} If required fields are missing
          */
-        public static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): terminal.ToggleScreenRequest;
+        public static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): terminal.ToggleScreenStatus;
 
         /**
-         * Decodes a ToggleScreenRequest message from the specified reader or buffer, length delimited.
+         * Decodes a ToggleScreenStatus message from the specified reader or buffer, length delimited.
          * @param reader Reader or buffer to decode from
-         * @returns ToggleScreenRequest
+         * @returns ToggleScreenStatus
          * @throws {Error} If the payload is not a reader or valid buffer
          * @throws {$protobuf.util.ProtocolError} If required fields are missing
          */
-        public static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): terminal.ToggleScreenRequest;
+        public static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): terminal.ToggleScreenStatus;
 
         /**
-         * Verifies a ToggleScreenRequest message.
+         * Verifies a ToggleScreenStatus message.
          * @param message Plain object to verify
          * @returns `null` if valid, otherwise the reason why it is not
          */
         public static verify(message: { [k: string]: any }): (string|null);
 
         /**
-         * Creates a ToggleScreenRequest message from a plain object. Also converts values to their respective internal types.
+         * Creates a ToggleScreenStatus message from a plain object. Also converts values to their respective internal types.
          * @param object Plain object
-         * @returns ToggleScreenRequest
+         * @returns ToggleScreenStatus
          */
-        public static fromObject(object: { [k: string]: any }): terminal.ToggleScreenRequest;
+        public static fromObject(object: { [k: string]: any }): terminal.ToggleScreenStatus;
 
         /**
-         * Creates a plain object from a ToggleScreenRequest message. Also converts values to other types if specified.
-         * @param message ToggleScreenRequest
+         * Creates a plain object from a ToggleScreenStatus message. Also converts values to other types if specified.
+         * @param message ToggleScreenStatus
          * @param [options] Conversion options
          * @returns Plain object
          */
-        public static toObject(message: terminal.ToggleScreenRequest, options?: $protobuf.IConversionOptions): { [k: string]: any };
+        public static toObject(message: terminal.ToggleScreenStatus, options?: $protobuf.IConversionOptions): { [k: string]: any };
 
         /**
-         * Converts this ToggleScreenRequest to JSON.
+         * Converts this ToggleScreenStatus to JSON.
          * @returns JSON object
          */
         public toJSON(): { [k: string]: any };
 
         /**
-         * Gets the default type url for ToggleScreenRequest
+         * Gets the default type url for ToggleScreenStatus
          * @param [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
          * @returns The default type url
          */
         public static getTypeUrl(typeUrlPrefix?: string): string;
     }
 
-    /** Properties of a ToggleAdminRequest. */
-    interface IToggleAdminRequest {
+    /** Properties of a ToggleAdminStatus. */
+    interface IToggleAdminStatus {
 
-        /** ToggleAdminRequest enabled */
+        /** ToggleAdminStatus enabled */
         enabled?: (boolean|null);
     }
 
-    /** Represents a ToggleAdminRequest. */
-    class ToggleAdminRequest implements IToggleAdminRequest {
+    /** Represents a ToggleAdminStatus. */
+    class ToggleAdminStatus implements IToggleAdminStatus {
 
         /**
-         * Constructs a new ToggleAdminRequest.
+         * Constructs a new ToggleAdminStatus.
          * @param [properties] Properties to set
          */
-        constructor(properties?: terminal.IToggleAdminRequest);
+        constructor(properties?: terminal.IToggleAdminStatus);
 
-        /** ToggleAdminRequest enabled. */
+        /** ToggleAdminStatus enabled. */
         public enabled: boolean;
 
         /**
-         * Creates a new ToggleAdminRequest instance using the specified properties.
+         * Creates a new ToggleAdminStatus instance using the specified properties.
          * @param [properties] Properties to set
-         * @returns ToggleAdminRequest instance
+         * @returns ToggleAdminStatus instance
          */
-        public static create(properties?: terminal.IToggleAdminRequest): terminal.ToggleAdminRequest;
+        public static create(properties?: terminal.IToggleAdminStatus): terminal.ToggleAdminStatus;
 
         /**
-         * Encodes the specified ToggleAdminRequest message. Does not implicitly {@link terminal.ToggleAdminRequest.verify|verify} messages.
-         * @param message ToggleAdminRequest message or plain object to encode
+         * Encodes the specified ToggleAdminStatus message. Does not implicitly {@link terminal.ToggleAdminStatus.verify|verify} messages.
+         * @param message ToggleAdminStatus message or plain object to encode
          * @param [writer] Writer to encode to
          * @returns Writer
          */
-        public static encode(message: terminal.IToggleAdminRequest, writer?: $protobuf.Writer): $protobuf.Writer;
+        public static encode(message: terminal.IToggleAdminStatus, writer?: $protobuf.Writer): $protobuf.Writer;
 
         /**
-         * Encodes the specified ToggleAdminRequest message, length delimited. Does not implicitly {@link terminal.ToggleAdminRequest.verify|verify} messages.
-         * @param message ToggleAdminRequest message or plain object to encode
+         * Encodes the specified ToggleAdminStatus message, length delimited. Does not implicitly {@link terminal.ToggleAdminStatus.verify|verify} messages.
+         * @param message ToggleAdminStatus message or plain object to encode
          * @param [writer] Writer to encode to
          * @returns Writer
          */
-        public static encodeDelimited(message: terminal.IToggleAdminRequest, writer?: $protobuf.Writer): $protobuf.Writer;
+        public static encodeDelimited(message: terminal.IToggleAdminStatus, writer?: $protobuf.Writer): $protobuf.Writer;
 
         /**
-         * Decodes a ToggleAdminRequest message from the specified reader or buffer.
+         * Decodes a ToggleAdminStatus message from the specified reader or buffer.
          * @param reader Reader or buffer to decode from
          * @param [length] Message length if known beforehand
-         * @returns ToggleAdminRequest
+         * @returns ToggleAdminStatus
          * @throws {Error} If the payload is not a reader or valid buffer
          * @throws {$protobuf.util.ProtocolError} If required fields are missing
          */
-        public static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): terminal.ToggleAdminRequest;
+        public static decode(reader: ($protobuf.Reader|Uint8Array), length?: number): terminal.ToggleAdminStatus;
 
         /**
-         * Decodes a ToggleAdminRequest message from the specified reader or buffer, length delimited.
+         * Decodes a ToggleAdminStatus message from the specified reader or buffer, length delimited.
          * @param reader Reader or buffer to decode from
-         * @returns ToggleAdminRequest
+         * @returns ToggleAdminStatus
          * @throws {Error} If the payload is not a reader or valid buffer
          * @throws {$protobuf.util.ProtocolError} If required fields are missing
          */
-        public static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): terminal.ToggleAdminRequest;
+        public static decodeDelimited(reader: ($protobuf.Reader|Uint8Array)): terminal.ToggleAdminStatus;
 
         /**
-         * Verifies a ToggleAdminRequest message.
+         * Verifies a ToggleAdminStatus message.
          * @param message Plain object to verify
          * @returns `null` if valid, otherwise the reason why it is not
          */
         public static verify(message: { [k: string]: any }): (string|null);
 
         /**
-         * Creates a ToggleAdminRequest message from a plain object. Also converts values to their respective internal types.
+         * Creates a ToggleAdminStatus message from a plain object. Also converts values to their respective internal types.
          * @param object Plain object
-         * @returns ToggleAdminRequest
+         * @returns ToggleAdminStatus
          */
-        public static fromObject(object: { [k: string]: any }): terminal.ToggleAdminRequest;
+        public static fromObject(object: { [k: string]: any }): terminal.ToggleAdminStatus;
 
         /**
-         * Creates a plain object from a ToggleAdminRequest message. Also converts values to other types if specified.
-         * @param message ToggleAdminRequest
+         * Creates a plain object from a ToggleAdminStatus message. Also converts values to other types if specified.
+         * @param message ToggleAdminStatus
          * @param [options] Conversion options
          * @returns Plain object
          */
-        public static toObject(message: terminal.ToggleAdminRequest, options?: $protobuf.IConversionOptions): { [k: string]: any };
+        public static toObject(message: terminal.ToggleAdminStatus, options?: $protobuf.IConversionOptions): { [k: string]: any };
 
         /**
-         * Converts this ToggleAdminRequest to JSON.
+         * Converts this ToggleAdminStatus to JSON.
          * @returns JSON object
          */
         public toJSON(): { [k: string]: any };
 
         /**
-         * Gets the default type url for ToggleAdminRequest
+         * Gets the default type url for ToggleAdminStatus
          * @param [typeUrlPrefix] your custom typeUrlPrefix(default "type.googleapis.com")
          * @returns The default type url
          */
