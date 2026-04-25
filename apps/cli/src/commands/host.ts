@@ -56,7 +56,15 @@ export default class Host extends Command {
     try {
       ptyModule = (await import('node-pty')) as PtyModule;
     } catch {
-      this.error('node-pty is required for host mode. Install build tools and retry.');
+      this.error(
+        'node-pty is required for host mode but could not be loaded.\n' +
+        'This usually means native build tools are missing.\n\n' +
+        'FIX:\n' +
+        '  - Termux: pkg install build-essential python\n' +
+        '  - Windows: npm install --global windows-build-tools\n' +
+        '  - Ubuntu/Debian: sudo apt install build-essential\n' +
+        'Then run: npm install -g terminal-tool\n'
+      );
     }
 
     const hwid = this.getHwid();
