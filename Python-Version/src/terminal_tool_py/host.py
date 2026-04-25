@@ -130,7 +130,7 @@ async def run_host(args) -> int:
         register = HostMessage(
             register_host=RegisterHostRequest(host_id=host_id, password=args.password),
         )
-        await websocket.send(register.SerializeToString())
+        await websocket.send(bytes(register))
 
         sessions: dict[str, PtySession] = {}
         queue: asyncio.Queue[SessionEnvelope] = asyncio.Queue()
@@ -146,16 +146,17 @@ async def run_host(args) -> int:
                     message = HostMessage(
                         pty_exit=PtyExit(code=event.code or 0, client_id=event.client_id),
                     )
-                await websocket.send(message.SerializeToString())
+                await websocket.send(bytes(message))
 
         sender_task = asyncio.create_task(sender_loop())
 
         try:
             async for payload in websocket:
-                client_message = ClientMessage()
-                client_message.ParseFromString(payload)
+                # betterproto uses .parse() and properties instead of HasField
+                client_message = ClientMessage().parse(payload)
+                
                 if client_message.client_id and (
-                    client_message.HasField("pty_input") or client_message.HasField("pty_resize")
+                    client_message.pty_input or client_message.pty_resize
                 ):
                     session = sessions.get(client_message.client_id)
                     if session is None:
@@ -168,25 +169,25 @@ async def run_host(args) -> int:
                         await session.start()
                         sessions[client_message.client_id] = session
 
-                    if client_message.HasField("pty_input"):
+                    if client_message.pty_input:
                         session.write(client_message.pty_input.data)
-                    elif client_message.HasField("pty_resize"):
+                    elif client_message.pty_resize:
                         session.resize(client_message.pty_resize.cols, client_message.pty_resize.rows)
                     continue
 
-                server_message = ServerMessage()
-                server_message.ParseFromString(payload)
+                server_message = ServerMessage().parse(payload)
 
-                if server_message.HasField("register_host_response"):
-                    if not server_message.register_host_response.ok:
+                if server_message.register_host_response:
+                    resp = server_message.register_host_response
+                    if not resp.ok:
                         print(
-                            f"Host registration failed: {server_message.register_host_response.error}",
+                            f"Host registration failed: {resp.error}",
                             file=sys.stderr,
                         )
                         return 1
                     print(f"Host ready: {host_id}", file=sys.stderr)
                     print(
-                        f"Reuse token: {server_message.register_host_response.token}",
+                        f"Reuse token: {resp.token}",
                         file=sys.stderr,
                     )
 
