@@ -193,6 +193,15 @@ export default class Host extends Command {
           
           if (msg.includes('TOGGLE_ADMIN')) {
               this.state.adminEnabled = !this.state.adminEnabled;
+              this.log(`Admin mode now: ${this.state.adminEnabled}. Restarting active sessions...`);
+              
+              // Restart all active sessions with the new privilege level
+              for (const [clientId, oldProc] of sessions.entries()) {
+                  oldProc.kill();
+                  sessions.delete(clientId);
+                  createSession(clientId);
+              }
+              
               send({ toggleAdmin: { enabled: this.state.adminEnabled } });
           }
           if (msg.includes('TOGGLE_SCREEN')) {

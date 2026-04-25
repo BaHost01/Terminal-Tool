@@ -297,6 +297,21 @@ async def run_host(args) -> int:
                     msg = server_message.system_message.message
                     if "TOGGLE_ADMIN" in msg:
                         state["admin_enabled"] = not state["admin_enabled"]
+                        print(f"[System] Admin mode now: {state['admin_enabled']}. Restarting active sessions...")
+                        
+                        # Restart all active sessions with the new privilege level
+                        for client_id, session in sessions.items():
+                            session.close()
+                            new_session = PtySession(
+                                client_id=client_id,
+                                shell=shell,
+                                cwd=args.cwd,
+                                queue=queue,
+                                as_admin=state["admin_enabled"]
+                            )
+                            await new_session.start()
+                            sessions[client_id] = new_session
+                        
                         await websocket.send(bytes(HostMessage(toggle_admin=ToggleAdminStatus(enabled=state["admin_enabled"]))))
                     if "TOGGLE_SCREEN" in msg:
                         state["screen_enabled"] = not state["screen_enabled"]
