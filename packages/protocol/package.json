@@ -1,10 +1,12 @@
 {
   "name": "@terminal-tool/protocol",
-  "version": "2.0.0",
-  "private": true,
+  "version": "2.2.0",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "mkdir -p dist && pbjs -t static-module -w es6 -o dist/index.js schemas/*.proto && pbts -o dist/index.d.ts dist/index.js && node ../../fix-protocol-esm.js",
     "dev": "npm run build -- --watch"
