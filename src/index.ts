@@ -390,39 +390,8 @@ wss.on('connection', (socket: WebSocket, req) => {
 
     if (!authenticated) {
       try {
-        if (clientMessage.registerHost) {
-          if (!authenticatePassword(clientMessage.registerHost.password)) {
-            sendServerMessage(socket, {
-              registerHostResponse: { ok: false, error: 'Invalid password' },
-            });
-            return;
-          }
-
-          if (!clientMessage.registerHost.hostId) {
-            sendErrorMessage(socket, 'hostId required');
-            return;
-          }
-
-          currentHostId = clientMessage.registerHost.hostId;
-          const host = getHost(currentHostId);
-          host.clientSockets.set(clientId, socket);
-          host.lastClientAt = nowIso();
-          authenticated = true;
-          sendServerMessage(socket, {
-            registerHostResponse: {
-              ok: true,
-              token: signToken({ hostId: currentHostId, role: 'client' }),
-            },
-          });
-          sendSystemMessage(socket, `Client connected as ${clientId}`);
-          if (host.settings.welcomeMessage) {
-            sendSystemMessage(socket, host.settings.welcomeMessage);
-          }
-          return;
-        }
-
         if (clientMessage.authRequest) {
-          let hostId = clientMessage.authRequest.hostId;
+          let hostId = clientMessage.authRequest.hostId || '';
           const providedToken = clientMessage.authRequest.token;
 
           if (providedToken && tokens.has(providedToken)) {
@@ -430,6 +399,11 @@ wss.on('connection', (socket: WebSocket, req) => {
           } else {
             const decoded = verifyToken(providedToken || '', 'client');
             hostId = hostId || decoded.hostId;
+          }
+
+          if (!hostId) {
+            sendErrorMessage(socket, 'hostId required');
+            return;
           }
 
           currentHostId = hostId;
