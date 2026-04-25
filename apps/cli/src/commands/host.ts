@@ -5,20 +5,6 @@ import { WebSocket } from 'ws';
 import { terminal } from '@terminal-tool/protocol';
 import screenshot from 'screenshot-desktop';
 
-interface HostSettingsResponse {
-  item: {
-    hostId: string;
-    settings: {
-      displayName: string;
-      notes: string;
-      readOnly: boolean;
-      welcomeMessage: string;
-      preferredShell: string;
-      preferredCwd: string;
-    };
-  };
-}
-
 interface PtyProcess {
   onData(callback: (data: string) => void): void;
   onExit(callback: (event: { exitCode: number }) => void): void;
@@ -155,7 +141,7 @@ export default class Host extends Command {
                         height: 720,
                     }
                 });
-            } catch (err) {
+            } catch {
                 // Ignore screen capture errors
             }
         }
