@@ -8,7 +8,7 @@ Install dependencies with `pnpm install` from the repo root. Use `pnpm build` to
 
 - `pnpm --filter @terminal-tool/web-ui dev` runs the Vite frontend locally.
 - `pnpm --filter @terminal-tool/relay-server dev` starts the relay server with `tsx`.
-- `pnpm --filter @terminal-tool/cli build` compiles the CLI.
+- `pnpm --filter terminal-tool build` compiles the CLI.
 - `pnpm --filter @terminal-tool/protocol build` regenerates protobuf artifacts from `packages/protocol/schemas/*.proto`.
 
 ## Coding Style & Naming Conventions

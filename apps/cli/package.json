@@ -1,10 +1,17 @@
 {
-  "name": "@terminal-tool/cli",
+  "name": "terminal-tool",
   "version": "2.0.0",
-  "private": true,
   "type": "module",
   "bin": {
     "terminal-tool": "./bin/run.js"
+  },
+  "files": [
+    "/bin",
+    "/dist",
+    "/oclif.manifest.json"
+  ],
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "tsc",
@@ -30,6 +37,7 @@
   "dependencies": {
     "@oclif/core": "^4.0.0",
     "@terminal-tool/protocol": "workspace:*",
+    "screenshot-desktop": "^1.15.4",
     "ws": "^8.18.0"
   },
   "optionalDependencies": {
@@ -39,6 +47,7 @@
     "@oclif/plugin-help": "^6.0.0",
     "@terminal-tool/config": "workspace:*",
     "@types/node": "^20.0.0",
+    "@types/screenshot-desktop": "^1.15.0",
     "@types/ws": "^8.5.10",
     "oclif": "^4.0.0",
     "typescript": "^5.5.0"

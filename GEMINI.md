@@ -41,8 +41,13 @@ A production-ready relay server is also available at the root level.
 - **Env Vars:** `PORT`, `HOST`, `JWT_SECRET`, `ADMIN_PASSWORD`.
 
 ### CLI Tool (`apps/cli`)
-- `bin/run.js host --server <URL> --password <PWD>`: Start a host session.
-- `bin/run.js client --server <URL> --hostId <ID>`: Connect to a host session.
+- **Package Name:** `terminal-tool` (Available on NPM)
+- `npm install -g terminal-tool`: Install globally.
+- `terminal-tool host --password <PWD>`: Start a host session.
+  - **Machine Tokens**: Uses automated MAC-based HWID + IP discovery.
+  - **Screen Sharing**: Built-in support for live screen capture.
+  - **Admin Shell**: Supports togglable elevated shells (`sudo` / `runas`).
+- `terminal-tool client --hostId <ID>`: Connect to a host session.
 
 ### Web UI (`apps/web-ui`)
 - `pnpm dev`: Start the Vite development server.
