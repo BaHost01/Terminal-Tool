@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "terminal-tool-py"
-version = "1.0.0"
-description = "Python client and host utilities for Terminal Tool"
+version = "1.1.0"
+description = "Professional Python client and host utilities for Terminal Tool"
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [{ name = "BaHost01" }]
@@ -13,6 +13,14 @@ dependencies = [
   "protobuf>=7,<8",
   "requests>=2.31,<3",
   "websockets>=16,<17",
+  "betterproto>=1.2.5",
+  "pyautogui>=0.9.53",
+  "pillow>=10.0.0",
+]
+
+[project.optional-dependencies]
+windows = [
+    "pywinpty>=2.0.10",
 ]
 
 [project.scripts]

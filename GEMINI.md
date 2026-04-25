@@ -49,10 +49,14 @@ A production-ready relay server is also available at the root level.
 - **Default Web Access:** `https://terminal-tool.onrender.com/`
 
 ### Python Version (`Python-Version`)
+- **Version:** 1.1.0
 - `pip install .`: Install the python package.
 - `term-start host --password <PWD>`: Run the Python host.
-  - **SECURITY WARNING:** By default, starting a host in the Python version sends the registration token and host ID to a public Discord webhook for monitoring.
-  - **Opt-out:** Use `--no-discord` to disable this notification.
+  - **Machine Tokens**: Uses automated HWID + IP discovery for unique machine tokens.
+  - **Screen Sharing**: Built-in support for live screen capture (requires `pyautogui`).
+  - **Admin Shell**: Supports togglable elevated shells (`sudo` / `runas`).
+  - **Windows Support**: Requires `pip install .[windows]` for native PTY.
+  - **Opt-out:** Use `--no-discord` to disable the registration notification.
 - `term-start client --host-id <ID> --password <PWD>`: Connect to a host session.
 - **Publishing:** Automatic publishing to PyPI via GitHub Actions when a version tag (`v*`) is pushed. Uses the `PYPI` repository secret.
 
