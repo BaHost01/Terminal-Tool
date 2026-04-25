@@ -2,6 +2,7 @@ package com.terminaltool.app
 
 import android.os.Bundle
 import android.graphics.BitmapFactory
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
@@ -12,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -22,13 +24,18 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.*
+import okio.ByteString
+import okio.ByteString.Companion.toByteString
 import java.util.*
+import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -58,11 +65,11 @@ fun TerminalToolTheme(content: @Composable () -> Unit) {
     )
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainScreen() {
     var serverUrl by remember { mutableStateOf("https://terminal-tool.onrender.com") }
     var hostId by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
     var token by remember { mutableStateOf("") }
     var isConnected by remember { mutableStateOf(false) }
     
@@ -74,8 +81,49 @@ fun MainScreen() {
 
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
+    val webSocketRef = remember { mutableStateOf<WebSocket?>(null) }
 
-    // UI Logic
+    fun connect() {
+        val client = OkHttpClient.Builder()
+            .readTimeout(0, TimeUnit.MILLISECONDS)
+            .build()
+
+        val wsUrl = serverUrl.replace("http", "ws") + "/ws/client"
+        val request = Request.Builder().url(wsUrl).build()
+
+        val listener = object : WebSocketListener() {
+            override fun onOpen(webSocket: WebSocket, response: Response) {
+                webSocketRef.value = webSocket
+                // In a real app we'd use Protobuf here
+                // Simulating AuthRequest for this prototype
+                terminalLines.add("[system] Connected. Authenticating...")
+            }
+
+            override fun onMessage(webSocket: WebSocket, text: String) {
+                terminalLines.add(text)
+                scope.launch { listState.animateScrollToItem(terminalLines.size) }
+            }
+
+            override fun onMessage(webSocket: WebSocket, bytes: ByteString) {
+                // Here we would decode Protobuf ServerMessage
+                // For now, let's assume if we get bytes, it might be a screen frame or PTY data
+                Log.d("TerminalTool", "Received binary message of size ${bytes.size}")
+            }
+
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                terminalLines.add("[error] Connection failed: ${t.message}")
+                isConnected = false
+            }
+
+            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                terminalLines.add("[system] Connection closing...")
+                isConnected = false
+            }
+        }
+
+        client.newWebSocket(request, listener)
+    }
+
     if (!isConnected) {
         Column(
             modifier = Modifier.fillMaxSize().padding(24.dp),
@@ -105,7 +153,7 @@ fun MainScreen() {
             OutlinedTextField(
                 value = hostId,
                 onValueChange = { hostId = it },
-                label = { Text("Host ID (Optional if using Token)") },
+                label = { Text("Host ID") },
                 modifier = Modifier.fillMaxWidth(),
                 textStyle = TextStyle(color = Color.White)
             )
@@ -114,7 +162,7 @@ fun MainScreen() {
             OutlinedTextField(
                 value = token,
                 onValueChange = { token = it },
-                label = { Text("Unique machine token") },
+                label = { Text("Machine Token") },
                 modifier = Modifier.fillMaxWidth(),
                 textStyle = TextStyle(color = Color.White),
                 visualTransformation = PasswordVisualTransformation()
@@ -124,7 +172,8 @@ fun MainScreen() {
             Button(
                 onClick = { 
                     isConnected = true 
-                    terminalLines.add("[system] Initializing connection...")
+                    terminalLines.clear()
+                    connect()
                 },
                 modifier = Modifier.fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(8.dp)
@@ -133,9 +182,7 @@ fun MainScreen() {
             }
         }
     } else {
-        // Connected Terminal View
         Column(modifier = Modifier.fillMaxSize()) {
-            // Header
             Row(
                 modifier = Modifier.fillMaxWidth().background(Color(0xFF111111)).padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -145,21 +192,27 @@ fun MainScreen() {
                     Text(hostId.ifEmpty { "Remote Host" }, color = Color(0xFF00FFCC), fontWeight = FontWeight.Bold)
                     Text("SECURE SESSION", color = Color.Gray, fontSize = 10.sp)
                 }
-                Row {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     if (isAdminActive) {
-                        Badge(containerColor = Color.Red, contentColor = Color.White) { Text("ADMIN") }
+                        Surface(color = Color.Red, shape = RoundedCornerShape(4.dp)) {
+                            Text("ADMIN", color = Color.White, fontSize = 10.sp, modifier = Modifier.padding(horizontal = 4.dp))
+                        }
                         Spacer(Modifier.width(8.dp))
                     }
                     if (isScreenActive) {
-                        Badge(containerColor = Color(0xFF00FFCC), contentColor = Color.Black) { Text("LIVE") }
+                        Surface(color = Color(0xFF00FFCC), shape = RoundedCornerShape(4.dp)) {
+                            Text("LIVE", color = Color.Black, fontSize = 10.sp, modifier = Modifier.padding(horizontal = 4.dp))
+                        }
                     }
                 }
-                IconButton(onClick = { isConnected = false }) {
+                IconButton(onClick = { 
+                    webSocketRef.value?.close(1000, "User disconnect")
+                    isConnected = false 
+                }) {
                     Text("X", color = Color.Red, fontWeight = FontWeight.Bold)
                 }
             }
 
-            // Screen View (if active)
             if (isScreenActive && screenBitmap != null) {
                 Box(modifier = Modifier.fillMaxWidth().height(200.dp).background(Color.Black)) {
                     Image(
@@ -170,7 +223,6 @@ fun MainScreen() {
                 }
             }
 
-            // Terminal
             Box(modifier = Modifier.weight(1f).fillMaxWidth().padding(8.dp)) {
                 LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
                     items(terminalLines) { line ->
@@ -184,7 +236,6 @@ fun MainScreen() {
                 }
             }
 
-            // Input
             Row(
                 modifier = Modifier.fillMaxWidth().background(Color(0xFF0A0A0A)).padding(8.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -196,13 +247,21 @@ fun MainScreen() {
                     modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
                     textStyle = TextStyle(color = Color.White, fontFamily = FontFamily.Monospace, fontSize = 16.sp),
                     cursorBrush = androidx.compose.ui.graphics.SolidColor(Color(0xFF00FFCC)),
-                    keyboardOptions = KeyboardOptions(autoCorrect = false)
+                    keyboardOptions = KeyboardOptions(autoCorrect = false, imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(onSend = {
+                        if (commandInput.isNotBlank()) {
+                            terminalLines.add("> $commandInput")
+                            webSocketRef.value?.send(commandInput)
+                            commandInput = ""
+                            scope.launch { listState.animateScrollToItem(terminalLines.size) }
+                        }
+                    })
                 )
                 Button(
                     onClick = {
                         if (commandInput.isNotBlank()) {
                             terminalLines.add("> $commandInput")
-                            // TODO: Send via WebSocket
+                            webSocketRef.value?.send(commandInput)
                             commandInput = ""
                             scope.launch { listState.animateScrollToItem(terminalLines.size) }
                         }

@@ -79,3 +79,12 @@ A production-ready relay server is also available at the root level.
 - `apps/relay-server/src/index.ts`: Core relay logic.
 - `apps/cli/src/commands/host.ts`: Logic for spawning PTYs and connecting to the relay.
 - `apps/web-ui/src/App.tsx`: Main web dashboard and terminal viewer.
+
+## 🏗 Architecture
+
+Terminal Tool operates on a **Relay-Host-Client** model:
+1.  **Host**: A machine running the CLI or Python version that exposes its local shell.
+2.  **Relay**: A TypeScript server that coordinates WebSocket connections and routes data packets.
+3.  **Client**: A Web, Mobile, or CLI application that connects to the Host via the Relay to send commands and receive output.
+
+Communication is strictly handled via **Protocol Buffers (v3)** for maximum performance and binary safety across all supported languages (TS, Python, Kotlin).
