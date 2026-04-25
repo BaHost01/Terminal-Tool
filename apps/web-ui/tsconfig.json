@@ -1,5 +1,5 @@
 {
-  "extends": "@terminal-tool/config/tsconfig",
+  "extends": "terminal-tool-config/tsconfig",
   "compilerOptions": {
     "target": "ESNext",
     "useDefineForClassFields": true,

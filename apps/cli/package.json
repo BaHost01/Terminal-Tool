@@ -1,6 +1,6 @@
 {
   "name": "terminal-tool",
-  "version": "2.2.3",
+  "version": "2.2.4",
   "type": "module",
   "bin": {
     "terminal-tool": "./bin/run.js"

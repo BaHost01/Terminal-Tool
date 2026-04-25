@@ -6,10 +6,10 @@ This repository is a `pnpm` monorepo for a terminal-sharing toolchain. Main apps
 ## Build, Test, and Development Commands
 Install dependencies with `pnpm install` from the repo root. Use `pnpm build` to build every workspace, `pnpm lint` to run ESLint across app sources, and `pnpm dev` for workspace watch/dev scripts. Target a single package when needed:
 
-- `pnpm --filter @terminal-tool/web-ui dev` runs the Vite frontend locally.
-- `pnpm --filter @terminal-tool/relay-server dev` starts the relay server with `tsx`.
+- `pnpm --filter terminal-tool-web-ui dev` runs the Vite frontend locally.
+- `pnpm --filter terminal-tool-relay-server dev` starts the relay server with `tsx`.
 - `pnpm --filter terminal-tool build` compiles the CLI.
-- `pnpm --filter @terminal-tool/protocol build` regenerates protobuf artifacts from `packages/protocol/schemas/*.proto`.
+- `pnpm --filter terminal-tool-protocol build` regenerates protobuf artifacts from `packages/protocol/schemas/*.proto`.
 
 ## Coding Style & Naming Conventions
 TypeScript is strict (`strict: true`) and uses ES module syntax. Follow the shared Prettier preset in `packages/config/prettier-preset.json`: 2-space indentation, semicolons, single quotes, trailing commas, and 100-character lines. ESLint enforces unused-variable checks; prefix intentionally unused parameters with `_`. Keep React components in PascalCase (`App.tsx`), command files lowercase by command name (`src/commands/host.ts`), and avoid editing generated `dist/` files by hand.
