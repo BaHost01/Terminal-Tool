@@ -27,4 +27,6 @@ def to_websocket_url(server: str, path: str) -> str:
 def resolve_shell(shell: str | None) -> str:
     if shell:
         return shell
+    if os.name == 'nt':
+        return "powershell.exe"
     return os.environ.get("SHELL") or shutil.which("bash") or shutil.which("sh") or "/bin/sh"
