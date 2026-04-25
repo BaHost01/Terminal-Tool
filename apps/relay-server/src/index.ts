@@ -2,7 +2,7 @@ import crypto from 'node:crypto';
 import http from 'node:http';
 import express from 'express';
 import { WebSocket, WebSocketServer } from 'ws';
-import { terminal } from '@terminal-tool/protocol';
+import { terminal } from 'terminal-tool-protocol';
 import { TokenService, RelayTokenPayload } from './token-service.js';
 
 const PORT = Number(process.env.PORT || 3000);

@@ -2,7 +2,7 @@ import { startTransition, useEffect, useRef, useState } from 'react';
 import { FitAddon } from '@xterm/addon-fit';
 import { Terminal as XTerm } from '@xterm/xterm';
 import '@xterm/xterm/css/xterm.css';
-import { terminal as protocol } from '@terminal-tool/protocol';
+import { terminal as protocol } from 'terminal-tool-protocol';
 import {
   Activity,
   KeyRound,

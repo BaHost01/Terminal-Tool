@@ -2,7 +2,7 @@ import { Command, Flags } from '@oclif/core';
 import os from 'node:os';
 import crypto from 'node:crypto';
 import { WebSocket } from 'ws';
-import { terminal } from '@terminal-tool/protocol';
+import { terminal } from 'terminal-tool-protocol';
 import screenshot from 'screenshot-desktop';
 
 interface PtyProcess {

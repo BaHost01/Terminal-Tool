@@ -1,6 +1,6 @@
 {
-  "name": "@terminal-tool/protocol",
-  "version": "2.2.2",
+  "name": "terminal-tool-protocol",
+  "version": "2.2.3",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -13,7 +13,7 @@
   },
   "devDependencies": {
     "protobufjs-cli": "^1.1.3",
-    "@terminal-tool/config": "workspace:*",
+    "terminal-tool-config": "workspace:*",
     "typescript": "^5.5.0"
   },
   "dependencies": {

@@ -1,6 +1,6 @@
 import { Command, Flags } from '@oclif/core';
 import { WebSocket } from 'ws';
-import { terminal } from '@terminal-tool/protocol';
+import { terminal } from 'terminal-tool-protocol';
 
 interface ClientTokenResponse {
   token: string;

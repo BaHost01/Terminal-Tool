@@ -22,7 +22,7 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@terminal-tool/protocol": "workspace:^",
+    "terminal-tool-protocol": "workspace:^",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
     "tsx": "^4.16.2",

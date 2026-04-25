@@ -1,6 +1,6 @@
 {
-  "name": "@terminal-tool/web-ui",
-  "version": "2.0.0",
+  "name": "terminal-tool-web-ui",
+  "version": "2.2.3",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,7 +10,7 @@
     "lint": "eslint src"
   },
   "dependencies": {
-    "@terminal-tool/protocol": "workspace:*",
+    "terminal-tool-protocol": "workspace:*",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "@xterm/xterm": "^5.5.0",
@@ -18,7 +18,7 @@
     "lucide-react": "^0.400.0"
   },
   "devDependencies": {
-    "@terminal-tool/config": "workspace:*",
+    "terminal-tool-config": "workspace:*",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
