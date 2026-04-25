@@ -1,1 +1,3 @@
-#!/usr/bin/env node\nimport { execute } from "@oclif/core";\nawait execute({ dir: import.meta.url });
+#!/usr/bin/env node
+import { execute } from "@oclif/core";
+await execute({ dir: import.meta.url });
