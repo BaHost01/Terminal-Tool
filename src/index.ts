@@ -364,14 +364,14 @@ wss.on('connection', (socket: WebSocket, req) => {
       }
 
       if (hostMessage.toggleScreen) {
-        host.screenActive = hostMessage.toggleScreen.enabled;
+        host.screenActive = Boolean(hostMessage.toggleScreen.enabled);
         for (const clientSocket of host.clientSockets.values()) {
           sendSystemMessage(clientSocket, `Host screen sharing ${host.screenActive ? 'enabled' : 'disabled'}`);
         }
       }
 
       if (hostMessage.toggleAdmin) {
-        host.adminActive = hostMessage.toggleAdmin.enabled;
+        host.adminActive = Boolean(hostMessage.toggleAdmin.enabled);
         for (const clientSocket of host.clientSockets.values()) {
           sendSystemMessage(clientSocket, `Host admin mode ${host.adminActive ? 'enabled' : 'disabled'}`);
         }
