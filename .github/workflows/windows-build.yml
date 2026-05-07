@@ -1,0 +1,71 @@
+name: Windows Host Build
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'apps/windows-host/**'
+      - 'packages/protocol/**'
+      - '.github/workflows/windows-build.yml'
+  pull_request:
+    paths:
+      - 'apps/windows-host/**'
+      - 'packages/protocol/**'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Setup vcpkg
+      uses: lukka/run-vcpkg@v11
+      with:
+        vcpkgDirectory: ${{ github.workspace }}/vcpkg
+        vcpkgGitCommitId: '3078498f3c83754902c611f71f92e42f9b2f3478' # Recent stable
+        vcpkgJsonGlob: 'apps/windows-host/vcpkg.json'
+
+    - name: Install C++ Dependencies
+      run: |
+        vcpkg install protobuf ixwebsocket --triplet x64-windows
+
+    - name: Setup Protoc
+      uses: arduino/setup-protoc@v3
+      with:
+        version: "25.x"
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Build C++ Core (HostEngine)
+      run: |
+        cd apps/windows-host/core
+        mkdir build
+        cd build
+        cmake .. -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows
+        cmake --build . --config Release
+
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 6.0.x
+
+    - name: Build C# UI (TerminalToolHost)
+      run: |
+        cd apps/windows-host/ui
+        dotnet build --configuration Release
+
+    - name: Package Artifacts
+      run: |
+        mkdir release
+        copy apps/windows-host/ui/bin/Release/net6.0-windows/TerminalToolHost.exe release/
+        copy apps/windows-host/core/build/Release/HostEngine.dll release/
+        # Also copy necessary runtime DLLs if any
+        dir release/
+
+    - name: Upload Build Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: TerminalTool-Windows-Host
+        path: release/

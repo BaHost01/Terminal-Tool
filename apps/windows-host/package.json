@@ -1,0 +1,13 @@
+{
+  "name": "@terminal-tool/windows-host",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Windows Host application for Terminal-Tool (C++ Core / C# WPF UI)",
+  "scripts": {
+    "build:proto": "protoc --proto_path=../../packages/protocol/schemas --cpp_out=core/proto terminal.proto",
+    "clean": "rm -rf core/proto/*.pb.*"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
