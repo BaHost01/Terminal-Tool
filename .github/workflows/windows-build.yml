@@ -24,7 +24,7 @@ jobs:
     - name: Setup vcpkg
       uses: lukka/run-vcpkg@v11
       with:
-        vcpkgDirectory: ${{ github.workspace }}/vcpkg
+        vcpkgDirectory: ${{ runner.temp }}/vcpkg
         vcpkgGitCommitId: '3078498f3c83754902c611f71f92e42f9b2f3478' # Recent stable
         vcpkgJsonGlob: 'apps/windows-host/vcpkg.json'
 
@@ -43,7 +43,7 @@ jobs:
         cd apps/windows-host/core
         mkdir build
         cd build
-        cmake .. -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows
+        cmake .. -DCMAKE_TOOLCHAIN_FILE=${{ runner.temp }}/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows
         cmake --build . --config Release
 
     - name: Setup .NET
