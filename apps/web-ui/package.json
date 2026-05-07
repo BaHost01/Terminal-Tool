@@ -1,7 +1,7 @@
 {
   "name": "terminal-tool-web-ui",
-  "version": "2.2.4",
-  "private": true,
+  "version": "3.0.0",
+  "private": false,
   "type": "module",
   "scripts": {
     "dev": "vite",

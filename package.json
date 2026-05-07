@@ -1,6 +1,6 @@
 {
   "name": "terminal-tool-monorepo",
-  "version": "2.2.4",
+  "version": "3.0.0",
   "private": true,
   "scripts": {
     "build": "pnpm -r --if-present run build",

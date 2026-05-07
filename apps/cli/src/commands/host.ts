@@ -142,18 +142,30 @@ export default class Host extends Command {
         if (this.state.screenEnabled && ws.readyState === WebSocket.OPEN) {
             try {
                 const img = await screenshot();
+                // Basic image sizing logic could be added here
                 send({
                     screenFrame: {
                         data: img,
-                        width: 1280, // placeholder
-                        height: 720,
+                        width: 1920,
+                        height: 1080,
                     }
                 });
             } catch {
                 // Ignore screen capture errors
             }
         }
-    }, 1000);
+    }, 2000); // 2 seconds for CLI version to be less intensive
+
+    // Heartbeat Loop
+    setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+            ws.ping();
+            // Explicitly ping the website if it's the production one
+            if (flags.server.includes('onrender.com')) {
+                fetch(flags.server).catch(() => {});
+            }
+        }
+    }, 30000); // 30 seconds heartbeat for the socket, website ping if needed
 
     ws.on('open', () => {
       this.log(`Connected to relay. Registering host ${hostId}...`);

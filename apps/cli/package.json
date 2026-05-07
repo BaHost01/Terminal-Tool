@@ -1,6 +1,24 @@
 {
   "name": "terminal-tool",
-  "version": "2.2.6",
+  "version": "3.0.0",
+  "description": "Cross-platform remote terminal sharing solution. Host your terminal and connect from anywhere.",
+  "keywords": [
+    "terminal",
+    "pty",
+    "remote-access",
+    "collaboration",
+    "sharing",
+    "windows-host",
+    "relay-server"
+  ],
+  "homepage": "https://github.com/BaHost01/Terminal-Tool",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BaHost01/Terminal-Tool.git"
+  },
+  "bugs": {
+    "url": "https://github.com/BaHost01/Terminal-Tool/issues"
+  },
   "type": "module",
   "bin": {
     "terminal-tool": "./bin/run.js"
@@ -19,7 +37,9 @@
     "dev": "tsc -w",
     "lint": "eslint src",
     "postpack": "rm -f oclif.manifest.json",
-    "prepack": "oclif manifest && oclif readme"
+    "prepack": "oclif manifest && oclif readme",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "oclif": {
     "bin": "terminal-tool",
@@ -32,6 +52,9 @@
       },
       "client": {
         "description": "Connect to a remote terminal"
+      },
+      "list": {
+        "description": "List available terminal hosts"
       }
     }
   },
@@ -51,6 +74,7 @@
     "@types/screenshot-desktop": "^1.15.0",
     "@types/ws": "^8.5.10",
     "oclif": "^4.0.0",
-    "typescript": "^5.5.0"
+    "typescript": "^5.5.0",
+    "vitest": "^1.6.0"
   }
 }
